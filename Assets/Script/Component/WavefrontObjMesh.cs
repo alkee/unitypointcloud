@@ -38,41 +38,42 @@ namespace upc.Component
             var materials = new Dictionary<string, Material> { { "default", defaultMaterial } };
             // TODO: objFile.MaterialLibraries support
 
-            var vertices = objFile.Vertices.Select(v => new Vector3(v.Position.X, v.Position.Y, v.Position.Z)).ToArray();
-            var normals = objFile.VertexNormals?.Select(n => new Vector3(n.X, n.Y, n.Z)).ToArray();
+            var lhs = lhsSourceCoordination ? -1 : 1;
+            var vertices = objFile.Vertices.Select(v => new Vector3(v.Position.X * lhs, v.Position.Y, v.Position.Z)).ToArray();
+            var normals = objFile.VertexNormals?.Select(n => new Vector3(n.X * lhs, n.Y, n.Z)).ToArray();
             // TODO: vertex color support
 
             var group = objFile.DefaultGroup;
             if (group != null)
             {
-                var obj = CreateMesh(vertices, normals, group, defaultMaterial, transform);
-
-                // source(data) level 에서 flipping 을 하고싶다면 face index 순서를 바꾸어야 할 것. : https://youtu.be/eJEpeUH1EMg?t=196
-                if (lhsSourceCoordination) obj.transform.localScale = new Vector3(-1, 1, 1);
+                var obj = CreateMesh(vertices, normals, group, defaultMaterial, transform, lhsSourceCoordination);
             }
 
             // TODO: group mesh 지원
         }
 
-        private static int[] CreateVertexIndecies(in Vector3[] vertices, ObjGroup group)
+        private static int[] CreateVertexIndecies(in Vector3[] vertices, ObjGroup group, bool flipFace)
         {
             var triangleIndecies = new List<int>();
             foreach (var f in group.Faces)
             {
-                foreach (var v in f.Vertices)
+                // 기준점
+                triangleIndecies.Add(f.Vertices[0].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
+
+                // face 의 flipping 은 face index 순서를 바꾸는 것. : https://youtu.be/eJEpeUH1EMg?t=196
+                int step = flipFace ? -1 : 1;
+                int index = flipFace ? f.Vertices.Count - 1 : 1;
+                while (index > 0 && index < f.Vertices.Count)
                 {
-                    triangleIndecies.Add(v.Vertex - 1); // .obj 내에서는 index 가 1 부터.
-                    if (v.Vertex > vertices.Length)
-                    {
-                        Debug.LogError($"{v.Vertex} value >= {vertices.Length}");
-                    }
-                    // TODO: uv (texture) 지원
+                    triangleIndecies.Add(f.Vertices[index].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
+                    index += step;
                 }
+                // TODO: uv (texture) 지원
             }
             return triangleIndecies.ToArray();
         }
 
-        private static GameObject CreateMesh(in Vector3[] vertices, in Vector3[] normals, ObjGroup group, Material material, Transform parent)
+        private static GameObject CreateMesh(in Vector3[] vertices, in Vector3[] normals, ObjGroup group, Material material, Transform parent, bool flipFace)
         {
             var obj = new GameObject(group.Name ?? "unnamed");
 
@@ -81,7 +82,7 @@ namespace upc.Component
             var mesh = mf.mesh;
             mesh.vertices = vertices;
             mesh.normals = normals;
-            mesh.triangles = CreateVertexIndecies(vertices, group);
+            mesh.triangles = CreateVertexIndecies(vertices, group, flipFace);
 
             // mesh renderer setup
             var mr = obj.AddComponent<MeshRenderer>();
