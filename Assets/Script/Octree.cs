@@ -48,6 +48,24 @@ namespace upc
             return results;
         }
 
+        /// <summary>
+        /// Draws node boundaries visually for debugging.
+        /// Must be called from OnDrawGizmos externally. See also: DrawAllObjects.
+        /// </summary>
+        public void DrawAllBounds()
+        {
+            rootNode.DrawAllBounds();
+        }
+
+        /// <summary>
+        /// Draws the bounds of all objects in the tree visually for debugging.
+        /// Must be called from OnDrawGizmos externally. See also: DrawAllBounds.
+        /// </summary>
+        public void DrawAllObjects()
+        {
+            rootNode.DrawAllObjects();
+        }
+
         private void Grow(Vector3 direction)
         {
             var xDirection = direction.x >= 0 ? 1 : -1;
@@ -101,9 +119,18 @@ namespace upc
             SetValues(newLength, minSize, center);
             if (oldRoot.Empty()) return;
 
+            int oldRootPosIndex = FindChildIndex(oldRoot.Center);
             CreateChildren();
-            int oldRootPos = FindChildIndex(oldRoot.Center);
-            children[oldRootPos] = oldRoot;
+            //var half = oldRoot.SideLength / 2;
+            //children = new OctreeNode<T>[8];
+            //for (var i = 0; i < 8; ++i)
+            //{
+            //    var xDirection = i % 2 == 0 ? -1 : 1;
+            //    var yDirection = i > 3 ? -1 : 1;
+            //    var zDirection = (i < 2 || (i > 3 && i < 6)) ? -1 : 1;
+            //    children[i] = new OctreeNode<T>(oldRoot.SideLength, minSize, center + new Vector3(xDirection * half, yDirection * half, zDirection * half));
+            //}
+            children[oldRootPosIndex] = oldRoot;
         }
 
         public bool Add(T obj, Vector3 objPos)
@@ -135,6 +162,50 @@ namespace upc
             {
                 child.GetNearBy(pos, sqrDistance, result);
             }
+        }
+
+        /// <summary>
+        /// Draws node boundaries visually for debugging.
+        /// Must be called from OnDrawGizmos externally. See also: DrawAllObjects.
+        /// </summary>
+        /// <param name="depth">Used for recurcive calls to this method.</param>
+        public void DrawAllBounds(float depth = 0)
+        {
+            float tintVal = depth / 10; // Will eventually get values > 1. Color rounds to 1 automatically
+            Gizmos.color = new Color(tintVal, 0, 1.0f - tintVal);
+
+            Bounds thisBounds = new Bounds(Center, new Vector3(SideLength, SideLength, SideLength));
+            Gizmos.DrawWireCube(thisBounds.center, thisBounds.size);
+
+            if (children != null)
+            {
+                depth++;
+                foreach (var child in children) child.DrawAllBounds(depth);
+            }
+            Gizmos.color = Color.white;
+        }
+
+        /// <summary>
+        /// Draws the bounds of all objects in the tree visually for debugging.
+        /// Must be called from OnDrawGizmos externally. See also: DrawAllBounds.
+        /// NOTE: marker.tif must be placed in your Unity /Assets/Gizmos subfolder for this to work.
+        /// </summary>
+        public void DrawAllObjects()
+        {
+            float tintVal = SideLength / 20;
+            Gizmos.color = new Color(0, 1.0f - tintVal, tintVal, 0.25f);
+
+            foreach (var elem in objects)
+            {
+                Gizmos.DrawIcon(elem.Value, "animationkeyframe", false);
+            }
+
+            if (children != null)
+            {
+                foreach (var child in children) child.DrawAllObjects();
+            }
+
+            Gizmos.color = Color.white;
         }
 
         private bool Empty()
@@ -197,7 +268,7 @@ namespace upc
                     }
 
                     // Now that we have the new children, move this node's existing objects into them
-                    foreach(var elem in objects)
+                    foreach (var elem in objects)
                     {
                         FindChild(elem.Value).SubAdd(elem.Key, elem.Value);
                     }

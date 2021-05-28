@@ -2,7 +2,7 @@
 
 namespace upc.Component
 {
-    [RequireComponent(typeof(MeshFilter))]
+    [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public class PointCloudRenderer : MonoBehaviour
     {
         public WavefrontObjMesh obj;
@@ -27,7 +27,6 @@ namespace upc.Component
         {
             using (new ElapsedTimeLogger("PointCloudSetup"))
             {
-                if (obj.lhsSourceCoordination) { transform.localScale = new Vector3(-1, 1, 1); }
                 mr.material = new Material(pointCloudShader);
 
                 target = obj.GetComponentInChildren<MeshFilter>().mesh;
@@ -46,6 +45,14 @@ namespace upc.Component
             }
 
             Debug.Log($"octree {octree.Count} positions");
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (octree == null) return;
+
+            octree.DrawAllBounds();
+            octree.DrawAllObjects();
         }
 
         public Color[] Colors
