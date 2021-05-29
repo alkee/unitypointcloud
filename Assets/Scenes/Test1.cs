@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using upc.Component;
@@ -17,6 +17,7 @@ public class Test1 : MonoBehaviour
     public void Test()
     {
         obj.gameObject.SetActive(false);
-        pcr.Setup();
+        var mesh = obj.GetComponentInChildren<MeshFilter>().mesh; // TODO: 2 개 이상의 submesh 존재하는 경우 처리
+        pcr.Setup(mesh);
     }
 }
