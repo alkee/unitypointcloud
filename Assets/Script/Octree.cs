@@ -84,6 +84,7 @@ namespace upc
     {
         public Vector3 Center { get; private set; }
         public float SideLength { get; private set; }
+        public int Count { get; private set; } // 하위 요소들 포함
 
         private float minSize;
         private Bounds bounds;
@@ -94,12 +95,12 @@ namespace upc
             public Vector3 Pos;
         }
 
-        //private List<Element> objects = new List<Element>();
+        //private Dictionary<T, Vector3> objects = new Dictionary<T, Vector3>();
+        private readonly List<Element> objects = new List<Element>();
 
-        private Dictionary<T, Vector3> objects = new Dictionary<T, Vector3>();
         private OctreeNode<T>[] children;
         private bool HasChildren { get { return children != null; } }
-        private Bounds[] childBounds;
+        //private Bounds[] childBounds;
 
         // If there are already NUM_OBJECTS_ALLOWED in a node, we split it into children
         // A generally good number seems to be something around 8-15
@@ -121,15 +122,6 @@ namespace upc
 
             int oldRootPosIndex = FindChildIndex(oldRoot.Center);
             CreateChildren();
-            //var half = oldRoot.SideLength / 2;
-            //children = new OctreeNode<T>[8];
-            //for (var i = 0; i < 8; ++i)
-            //{
-            //    var xDirection = i % 2 == 0 ? -1 : 1;
-            //    var yDirection = i > 3 ? -1 : 1;
-            //    var zDirection = (i < 2 || (i > 3 && i < 6)) ? -1 : 1;
-            //    children[i] = new OctreeNode<T>(oldRoot.SideLength, minSize, center + new Vector3(xDirection * half, yDirection * half, zDirection * half));
-            //}
             children[oldRootPosIndex] = oldRoot;
         }
 
@@ -139,7 +131,7 @@ namespace upc
             {
                 return false;
             }
-            SubAdd(obj, objPos);
+            Add(new Element { Obj = obj, Pos = objPos });
             return true;
         }
 
@@ -152,9 +144,9 @@ namespace upc
 
             foreach (var elem in objects)
             {
-                if ((pos - elem.Value).sqrMagnitude < sqrDistance)
+                if ((pos - elem.Pos).sqrMagnitude < sqrDistance)
                 {
-                    result.Add(elem.Key);
+                    result.Add(elem.Obj);
                 }
             }
 
@@ -197,7 +189,7 @@ namespace upc
 
             foreach (var elem in objects)
             {
-                Gizmos.DrawIcon(elem.Value, "animationkeyframe", false);
+                Gizmos.DrawIcon(elem.Pos, "animationkeyframe", false);
             }
 
             if (children != null)
@@ -226,58 +218,41 @@ namespace upc
             // Create the bounding box.
             actualBoundsSize = new Vector3(SideLength, SideLength, SideLength);
             bounds = new Bounds(Center, actualBoundsSize);
-
-            var quarter = SideLength / 4f;
-            var childActualLength = SideLength / 2;
-            Vector3 childActualSize = new Vector3(childActualLength, childActualLength, childActualLength);
-            childBounds = new Bounds[8];
-            childBounds[0] = new Bounds(Center + new Vector3(-quarter, quarter, -quarter), childActualSize);
-            childBounds[1] = new Bounds(Center + new Vector3(quarter, quarter, -quarter), childActualSize);
-            childBounds[2] = new Bounds(Center + new Vector3(-quarter, quarter, quarter), childActualSize);
-            childBounds[3] = new Bounds(Center + new Vector3(quarter, quarter, quarter), childActualSize);
-            childBounds[4] = new Bounds(Center + new Vector3(-quarter, -quarter, -quarter), childActualSize);
-            childBounds[5] = new Bounds(Center + new Vector3(quarter, -quarter, -quarter), childActualSize);
-            childBounds[6] = new Bounds(Center + new Vector3(-quarter, -quarter, quarter), childActualSize);
-            childBounds[7] = new Bounds(Center + new Vector3(quarter, -quarter, quarter), childActualSize);
         }
 
-        private void SubAdd(T obj, Vector3 objPos)
+        /// <summary>
+        ///     add a element in given position
+        /// </summary>
+        /// <param name="e">elemt to be added</param>
+        /// <returns>a leaf node which contains the point</returns>
+        private OctreeNode<T> Add(Element e)
         {
             // We know it fits at this level if we've got this far
+            ++Count; // never fails
 
             // We always put things in the deepest possible child
             // So we can skip checks and simply move down if there are children aleady
-            if (!HasChildren)
+            if (HasChildren == false)
             {
                 // Just add if few objects are here, or children would be below min size
                 if (objects.Count < NUM_OBJECTS_ALLOWED || (SideLength / 2) < minSize)
                 {
-                    //var newObj = new Element { Obj = obj, Pos = objPos };
-                    objects.Add(obj, objPos);
-                    return; // We're done. No children yet
+                    objects.Add(e);
+                    return this; // We're done. No children yet
                 }
 
                 // Enough objects in this node already: Create the 8 children
-                if (children == null)
+                CreateChildren();
+                // Now that we have the new children, move this node's existing objects into them
+                foreach (var elem in objects)
                 {
-                    CreateChildren();
-                    if (children == null)
-                    {
-                        Debug.LogError("Child creation failed for an unknown reason. Early exit.");
-                        return;
-                    }
-
-                    // Now that we have the new children, move this node's existing objects into them
-                    foreach (var elem in objects)
-                    {
-                        FindChild(elem.Value).SubAdd(elem.Key, elem.Value);
-                    }
-                    objects.Clear(); // Remove from here
+                    FindChild(elem.Pos).Add(elem);
                 }
+                objects.Clear(); // Remove from here
             }
 
             // Handle the new object we're adding now
-            FindChild(objPos).SubAdd(obj, objPos);
+            return FindChild(e.Pos).Add(e);
         }
 
         private void CreateChildren()

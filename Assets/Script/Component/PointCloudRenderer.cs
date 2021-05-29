@@ -7,6 +7,7 @@ namespace upc.Component
     {
         public WavefrontObjMesh obj;
         public Shader pointCloudShader;
+        public bool drawOctree;
 
         private MeshFilter mf;
         private MeshRenderer mr;
@@ -39,17 +40,28 @@ namespace upc.Component
                 for (var i = 0; i < indecies.Length; ++i)
                 {
                     indecies[i] = i;
-                    octree.Add(i, Vertices[i]);
                 }
                 mf.mesh.SetIndices(indecies, MeshTopology.Points, 0);
             }
 
-            Debug.Log($"octree {octree.Count} positions");
+            var vertices = target.vertices;
+            var pointIndexcies = mf.mesh.GetIndices(0);
+
+            using (new ElapsedTimeLogger("octree insersion"))
+            {
+                for(var i=0;i<vertices.Length;++i)
+                {
+                    octree.Add(pointIndexcies[i], vertices[i]);
+                }
+                //octree.Add(mf.mesh.GetIndices(0), target.vertices);
+            }
+
+            Debug.Log($"octree {octree.Count} / vertices {target.vertexCount}");
         }
 
         private void OnDrawGizmos()
         {
-            if (octree == null) return;
+            if (octree == null || drawOctree == false) return;
 
             octree.DrawAllBounds();
             octree.DrawAllObjects();
