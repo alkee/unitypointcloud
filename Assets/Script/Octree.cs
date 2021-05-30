@@ -118,7 +118,7 @@ namespace upc
         {
             var newLength = oldRoot.SideLength * 2;
             SetValues(newLength, minSize, center);
-            if (oldRoot.Empty()) return;
+            if (oldRoot.Count == 0) return;
 
             int oldRootPosIndex = FindChildIndex(oldRoot.Center);
             CreateChildren();
@@ -137,22 +137,22 @@ namespace upc
 
         public void GetNearBy(Vector3 pos, float sqrDistance, List<T> result)
         {
-            //var srcBounds = new Bounds(pos, Vector3.one * sqrDistance);
-            //if (bounds.Intersects(srcBounds) == false) return; // not interested
+            if (Count == 0) return; // no point in here
             if ((bounds.ClosestPoint(pos) - pos).sqrMagnitude > sqrDistance) return; // not interested
-            if (Empty()) return;
 
+            if (children != null)
+            {
+                foreach (var child in children) child.GetNearBy(pos, sqrDistance, result); // recursive call to children
+                return;
+            }
+
+            // this is a leaf node
             foreach (var elem in objects)
             {
                 if ((pos - elem.Pos).sqrMagnitude < sqrDistance)
                 {
                     result.Add(elem.Obj);
                 }
-            }
-
-            foreach (var child in children)
-            {
-                child.GetNearBy(pos, sqrDistance, result);
             }
         }
 
@@ -198,15 +198,6 @@ namespace upc
             }
 
             Gizmos.color = Color.white;
-        }
-
-        private bool Empty()
-        {
-            if (objects.Count > 0) return true;
-            if (children == null) return false;
-            foreach (var child in children)
-                if (child.Empty() == false) return true;
-            return false;
         }
 
         private void SetValues(float baseLengthVal, float minSizeVal, Vector3 centerVal)
