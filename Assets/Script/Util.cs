@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -217,6 +218,18 @@ namespace upc
             T[,,] buff3D = new T[h, w, d];
             Buffer.BlockCopy(source, 0, buff3D, 0, h * w);
             return buff3D;
+        }
+    }
+
+    public static class UnityExt
+    {
+        public static Vector3 GetMeanVector(this IEnumerable<Vector3> points)
+        {
+            var count = points.Count();
+            if (count == 0) return Vector3.zero;
+            var sum = Vector3.zero;
+            foreach (var p in points) sum += p;
+            return sum / count;
         }
     }
 }
