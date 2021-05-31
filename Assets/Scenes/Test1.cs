@@ -38,9 +38,9 @@ public class Test1 : MonoBehaviour
             Parallel.For(0, count, (i) =>
             {
                 var p = pc.Points[i];
-                var neighborIndecies = pc.GetPointIndecies(p, radius);
-                if (neighborIndecies.Count < 3) { values[i] = float.NaN; return; }
-                var neighbors = pc.GetPoints(neighborIndecies);
+                var neighborIndices = pc.GetPointIndices(p, radius);
+                if (neighborIndices.Count < 3) { values[i] = float.NaN; return; }
+                var neighbors = pc.GetPoints(neighborIndices);
                 var center = neighbors.GetMeanVector();
 
                 var mat = Matrix<float>.Build.Dense(3, neighbors.Count, (r, c) => neighbors[c][r]);
@@ -88,7 +88,7 @@ public class Test1 : MonoBehaviour
     {
         var samplIndex = 20000;
         var p = pc.Points[samplIndex];
-        var pis = pc.GetPointIndecies(p, 0.02f);
+        var pis = pc.GetPointIndices(p, 0.02f);
         var points = pc.GetPoints(pis);
         Debug.Log($"points found = {pis.Count}");
         // coloring

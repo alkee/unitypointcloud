@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -31,28 +31,35 @@ namespace upc
             // octree calculation
             var diagonalLength = (Bounds.max - Bounds.min).magnitude;
             octree = new Octree<int>(diagonalLength, Bounds.center
-                , diagonalLength / 100); // cloud comapre �� �⺻ geometry radius; https://bitbucket.org/alkee_skia/mars3/issues/230/scene-idea#comment-60583560
+                , diagonalLength / 100); // cloud comapre 의 기본 geometry radius; https://bitbucket.org/alkee_skia/mars3/issues/230/scene-idea#comment-60583560
             for (var i = 0; i < Count; ++i)
             {
                 octree.Add(i, Points[i]);
             }
         }
 
-        public List<int/*point indexes*/> GetPointIndecies(Vector3 center, float radius)
+        public List<int/*point indexes*/> GetPointIndices(Vector3 center, float radius)
         {
-            return octree.GetNearBy(center, radius);
+            return octree.GetPointIndicesIn(center, radius);
         }
 
-        public List<Vector3> GetPoints(List<int> indecies)
+        public List<Vector3> GetPoints(List<int> indices)
         {
-            if (indecies == null) throw new ArgumentNullException(nameof(indecies));
-            return indecies.Select(x => Points[x]).ToList();
+            if (indices == null) throw new ArgumentNullException(nameof(indices));
+            return indices.Select(x => Points[x]).ToList();
         }
 
         public List<Vector3> GetPoints(Vector3 center, float radius)
         {
-            var indecies = GetPointIndecies(center, radius);
-            return GetPoints(indecies);
+            var indices = GetPointIndices(center, radius);
+            return GetPoints(indices);
+        }
+
+        // 이 함수는 OnGizmoDraw 함수에서만 사용가능
+        public void DrawOctreeBounds()
+        {
+            if (octree == null) return;
+            octree.DrawAllBounds();
         }
     }
 }
