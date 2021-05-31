@@ -9,6 +9,8 @@ public class Test1 : MonoBehaviour
     private WavefrontObjMesh obj;
     private PointCloudRenderer pcr;
 
+    private PointCloud pc;
+
     private void Awake()
     {
         obj = FindObjectOfType<WavefrontObjMesh>(true); Debug.Assert(obj);
@@ -19,7 +21,8 @@ public class Test1 : MonoBehaviour
     {
         obj.gameObject.SetActive(false);
         var mesh = obj.GetComponentInChildren<MeshFilter>().mesh; // TODO: 2 개 이상의 submesh 존재하는 경우 처리
-        pcr.Setup(mesh);
+        pc = new PointCloud(mesh);
+        pcr.Setup(pc);
     }
 
     public void Test2()
@@ -28,16 +31,16 @@ public class Test1 : MonoBehaviour
         var max = float.MinValue;
         var radius = 0.006f;
 
-        var count = pcr.Points.Length;
+        var count = pc.Points.Length;
         var values = new float[count];
         using (new ElapsedTimeLogger("calculating roughness"))
         {
             Parallel.For(0, count, (i) =>
             {
-                var p = pcr.Points[i];
-                var neighborIndecies = pcr.GetPointIndecies(p, radius);
+                var p = pc.Points[i];
+                var neighborIndecies = pc.GetPointIndecies(p, radius);
                 if (neighborIndecies.Count < 3) { values[i] = float.NaN; return; }
-                var neighbors = pcr.GetPoints(neighborIndecies);
+                var neighbors = pc.GetPoints(neighborIndecies);
                 var center = neighbors.GetMeanVector();
 
                 var mat = Matrix<float>.Build.Dense(3, neighbors.Count, (r, c) => neighbors[c][r]);
@@ -57,19 +60,19 @@ public class Test1 : MonoBehaviour
         var gradient = new Gradient();
 
         // Populate the color keys at the relative time 0 and 1 (0 and 100%)
-        var colorKey = new GradientColorKey[3];
-        colorKey[0].color = Color.blue;
-        colorKey[0].time = 0.0f;
-        colorKey[1].color = Color.yellow;
-        colorKey[1].time = 0.2f;
-        colorKey[2].color = Color.red;
-        colorKey[2].time = 1.0f;
-        var alphaKey = new GradientAlphaKey[2];
-        alphaKey[0].alpha = 1.0f;
-        alphaKey[0].time = 0.0f;
-        alphaKey[1].alpha = 1.0f;
-        alphaKey[1].time = 1.0f;
-        gradient.SetKeys(colorKey, alphaKey);
+        var colorKeys = new GradientColorKey[] { 
+            new GradientColorKey { color = Color.blue, time = 0.0f },
+            new GradientColorKey { color = Color.green, time = 0.3f },
+            new GradientColorKey { color = Color.yellow, time = 0.6f },
+            new GradientColorKey { color = Color.red, time = 1.0f },
+        };
+        var alphaKeys = new GradientAlphaKey[]
+        {
+            new GradientAlphaKey { alpha = 1.0f, time = 0.0f },
+            new GradientAlphaKey { alpha = 1.0f, time = 1.0f },
+        };
+
+        gradient.SetKeys(colorKeys, alphaKeys);
 
         var t = max - min;
         Parallel.For(0, count, (i) =>
@@ -84,9 +87,9 @@ public class Test1 : MonoBehaviour
     private void PlaneTest1()
     {
         var samplIndex = 20000;
-        var p = pcr.Points[samplIndex];
-        var pis = pcr.GetPointIndecies(p, 0.02f);
-        var points = pcr.GetPoints(pis);
+        var p = pc.Points[samplIndex];
+        var pis = pc.GetPointIndecies(p, 0.02f);
+        var points = pc.GetPoints(pis);
         Debug.Log($"points found = {pis.Count}");
         // coloring
         foreach (var pi in pis) pcr.Colors[pi] = Color.green;
