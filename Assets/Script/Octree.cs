@@ -11,7 +11,6 @@ namespace upc
         public int Count { get; private set; }
 
         private OctreeNode<T> rootNode;
-        private readonly float initialSize;
         private readonly float minSize;
 
         public Octree(float initialWorldSize, Vector3 initialWorldPos, float minNodeSize)
@@ -21,18 +20,17 @@ namespace upc
                 throw new ArgumentException($"Minimum node size must be at least as big as the initial world size. {nameof(minNodeSize)}: {minNodeSize}, {nameof(initialWorldSize)}: {initialWorldSize}");
             }
             Count = 0;
-            initialSize = initialWorldSize;
             minSize = minNodeSize;
-            rootNode = new OctreeNode<T>(initialSize, minSize, initialWorldPos);
+            rootNode = new OctreeNode<T>(initialWorldSize, minSize, initialWorldPos);
         }
 
         public void Add(T obj, Vector3 objPos)
         {
             // Add object or expand the octree until it can be added
-            int safetyCounter = 0; // Safety check against infinite/excessive growth
+            var safetyCounter = 0; // Safety check against infinite/excessive growth
             while (!rootNode.Add(obj, objPos))
             {
-                Grow(objPos - rootNode.Center);
+                Grow(objPos - rootNode.Bounds.center);
                 if (++safetyCounter > 20)
                 {
                     throw new ApplicationException("Aborted Add operation as it seemed to be going on forever attempts at growing the octree.");
@@ -41,26 +39,30 @@ namespace upc
             Count++;
         }
 
-        public List<T> GetNearBy(Vector3 pos, float maxDistance)
+        public List<T> GetPointIndicesIn(Vector3 pos, float radius)
         {
             var results = new List<T>();
-            rootNode.GetNearBy(pos, maxDistance * maxDistance, results);
+            rootNode.GetNearBy(pos, radius * radius, results);
             return results;
         }
 
         /// <summary>
-        /// Draws node boundaries visually for debugging.
-        /// Must be called from OnDrawGizmos externally. See also: DrawAllObjects.
+        ///     Draws node boundaries visually for debugging.
         /// </summary>
+        /// <remarks>
+        ///     Must be called from OnDrawGizmos externally. See also: <see cref="DrawAllObjects"/>
+        /// </remarks>
         public void DrawAllBounds()
         {
             rootNode.DrawAllBounds();
         }
 
         /// <summary>
-        /// Draws the bounds of all objects in the tree visually for debugging.
-        /// Must be called from OnDrawGizmos externally. See also: DrawAllBounds.
+        ///     Draws the bounds of all objects in the tree visually for debugging.
         /// </summary>
+        /// <remarks>
+        ///     Must be called from OnDrawGizmos externally. See also: <see cref="DrawAllBounds"/>
+        /// </remarks>
         public void DrawAllObjects()
         {
             rootNode.DrawAllObjects();
@@ -73,7 +75,7 @@ namespace upc
             var zDirection = direction.z >= 0 ? 1 : -1;
             var oldRoot = rootNode;
             var half = rootNode.SideLength / 2;
-            Vector3 newCenter = rootNode.Center + new Vector3(xDirection * half, yDirection * half, zDirection * half);
+            var newCenter = rootNode.Bounds.center + new Vector3(xDirection * half, yDirection * half, zDirection * half);
 
             // Create a new, bigger octree root node
             rootNode = new OctreeNode<T>(oldRoot, minSize, newCenter);
@@ -82,12 +84,11 @@ namespace upc
 
     public class OctreeNode<T>
     {
-        public Vector3 Center { get; private set; }
-        public float SideLength { get; private set; }
+        public Bounds Bounds { get; private set; }
+        public float SideLength { get => Bounds.size.x; } // 정사각형
         public int Count { get; private set; } // 하위 요소들 포함
 
-        private float minSize;
-        private Bounds bounds;
+        private readonly float minSize;
 
         private class Element
         {
@@ -95,54 +96,48 @@ namespace upc
             public Vector3 Pos;
         }
 
-        //private Dictionary<T, Vector3> objects = new Dictionary<T, Vector3>();
         private readonly List<Element> objects = new List<Element>();
 
-        private OctreeNode<T>[] children;
+        private OctreeNode<T>[] children; // leaf 인 경우 children 이 없을 수 있으므로 초기화는 필요한 경우에(lazy initialize) 한함.
         private bool HasChildren { get { return children != null; } }
-        //private Bounds[] childBounds;
 
         // If there are already NUM_OBJECTS_ALLOWED in a node, we split it into children
         // A generally good number seems to be something around 8-15
         private const int NUM_OBJECTS_ALLOWED = 8;
 
-        // to revert the bounds size after temporary changes
-        private Vector3 actualBoundsSize;
-
-        public OctreeNode(float baseLengthVal, float minSizeVal, Vector3 centerVal)
+        public OctreeNode(float baseLength, float minSize, Vector3 center)
         {
-            SetValues(baseLengthVal, minSizeVal, centerVal);
+            this.minSize = minSize;
+            Bounds = new Bounds(center, Vector3.one * baseLength);
         }
 
-        public OctreeNode(OctreeNode<T> oldRoot, float minSize, Vector3 center)
+        /// <summary>
+        ///     constuct a bigger node that contains a child
+        /// </summary>
+        public OctreeNode(OctreeNode<T> child, float minSize, Vector3 center)
+            : this(child.SideLength * 2, minSize, center)
         {
-            var newLength = oldRoot.SideLength * 2;
-            SetValues(newLength, minSize, center);
-            if (oldRoot.Count == 0) return;
-
-            int oldRootPosIndex = FindChildIndex(oldRoot.Center);
+            int childIndex = FindChildIndex(child.Bounds.center);
             CreateChildren();
-            children[oldRootPosIndex] = oldRoot;
+            children[childIndex] = child;
         }
 
         public bool Add(T obj, Vector3 objPos)
         {
-            if (bounds.Contains(objPos) == false)
-            {
-                return false;
-            }
+            if (Bounds.Contains(objPos) == false) return false; // not in charge
+
             Add(new Element { Obj = obj, Pos = objPos });
             return true;
         }
 
-        public void GetNearBy(Vector3 pos, float sqrDistance, List<T> result)
+        public void GetNearBy(Vector3 pos, float sqrDistance, List<T> outResult)
         {
-            if (Count == 0) return; // no point in here
-            if ((bounds.ClosestPoint(pos) - pos).sqrMagnitude > sqrDistance) return; // not interested
+            if (Count == 0) return; // no points in here
+            if ((Bounds.ClosestPoint(pos) - pos).sqrMagnitude > sqrDistance) return; // not interested
 
-            if (children != null)
+            if (children != null) // this is not a leaf
             {
-                foreach (var child in children) child.GetNearBy(pos, sqrDistance, result); // recursive call to children
+                foreach (var child in children) child.GetNearBy(pos, sqrDistance, outResult); // recursive call to children
                 return;
             }
 
@@ -151,64 +146,50 @@ namespace upc
             {
                 if ((pos - elem.Pos).sqrMagnitude < sqrDistance)
                 {
-                    result.Add(elem.Obj);
+                    outResult.Add(elem.Obj);
                 }
             }
         }
 
         /// <summary>
-        /// Draws node boundaries visually for debugging.
-        /// Must be called from OnDrawGizmos externally. See also: DrawAllObjects.
+        ///     Draws node boundaries visually for debugging.
+        ///     Must be called from OnDrawGizmos externally. See also: <see cref="DrawAllObjects">.
         /// </summary>
         /// <param name="depth">Used for recurcive calls to this method.</param>
-        public void DrawAllBounds(float depth = 0)
+        public void DrawAllBounds(int depth = 0)
         {
-            float tintVal = depth / 10; // Will eventually get values > 1. Color rounds to 1 automatically
-            Gizmos.color = new Color(tintVal, 0, 1.0f - tintVal);
+            var tintVal = depth / 10.0f; // Will eventually get values > 1. Color rounds to 1 automatically
 
-            Bounds thisBounds = new Bounds(Center, new Vector3(SideLength, SideLength, SideLength));
-            Gizmos.DrawWireCube(thisBounds.center, thisBounds.size);
-
-            if (children != null)
+            var backupColor = Gizmos.color;
+            using (new Defer(() => Gizmos.color = backupColor))
             {
-                depth++;
-                foreach (var child in children) child.DrawAllBounds(depth);
+                Gizmos.color = new Color(tintVal, 0, 1.0f - tintVal);
+                Gizmos.DrawWireCube(Bounds.center, Bounds.size);
+                if (children != null)
+                {
+                    depth++;
+                    foreach (var child in children) child.DrawAllBounds(depth);
+                }
             }
-            Gizmos.color = Color.white;
         }
 
         /// <summary>
-        /// Draws the bounds of all objects in the tree visually for debugging.
-        /// Must be called from OnDrawGizmos externally. See also: DrawAllBounds.
-        /// NOTE: marker.tif must be placed in your Unity /Assets/Gizmos subfolder for this to work.
+        ///     Draws the bounds of all objects in the tree visually for debugging.
+        ///     Must be called from OnDrawGizmos externally. See also: <see cref="DrawAllBounds(int)"/> DrawAllBounds.
         /// </summary>
         public void DrawAllObjects()
         {
-            float tintVal = SideLength / 20;
-            Gizmos.color = new Color(0, 1.0f - tintVal, tintVal, 0.25f);
+            if (children != null)
+            {
+                foreach (var child in children) child.DrawAllObjects();
+                return;
+            }
 
+            // leaf node
             foreach (var elem in objects)
             {
                 Gizmos.DrawIcon(elem.Pos, "animationkeyframe", false);
             }
-
-            if (children != null)
-            {
-                foreach (var child in children) child.DrawAllObjects();
-            }
-
-            Gizmos.color = Color.white;
-        }
-
-        private void SetValues(float baseLengthVal, float minSizeVal, Vector3 centerVal)
-        {
-            SideLength = baseLengthVal;
-            minSize = minSizeVal;
-            Center = centerVal;
-
-            // Create the bounding box.
-            actualBoundsSize = new Vector3(SideLength, SideLength, SideLength);
-            bounds = new Bounds(Center, actualBoundsSize);
         }
 
         /// <summary>
@@ -239,7 +220,7 @@ namespace upc
                 {
                     FindChild(elem.Pos).Add(elem);
                 }
-                objects.Clear(); // Remove from here
+                objects.Clear(); // Remove from here. This node is not a leaf anymore.
             }
 
             // Handle the new object we're adding now
@@ -248,30 +229,32 @@ namespace upc
 
         private void CreateChildren()
         {
-            float quarter = SideLength / 4f;
-            float newLength = SideLength / 2;
+            var quarter = SideLength / 4f;
+            var newLength = SideLength / 2;
+            var center = Bounds.center;
             children = new OctreeNode<T>[8];
-            children[0] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(-quarter, quarter, -quarter));
-            children[1] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(quarter, quarter, -quarter));
-            children[2] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(-quarter, quarter, quarter));
-            children[3] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(quarter, quarter, quarter));
-            children[4] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(-quarter, -quarter, -quarter));
-            children[5] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(quarter, -quarter, -quarter));
-            children[6] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(-quarter, -quarter, quarter));
-            children[7] = new OctreeNode<T>(newLength, minSize, Center + new Vector3(quarter, -quarter, quarter));
+            children[0] = new OctreeNode<T>(newLength, minSize, center + new Vector3(-quarter, quarter, -quarter));
+            children[1] = new OctreeNode<T>(newLength, minSize, center + new Vector3(quarter, quarter, -quarter));
+            children[2] = new OctreeNode<T>(newLength, minSize, center + new Vector3(-quarter, quarter, quarter));
+            children[3] = new OctreeNode<T>(newLength, minSize, center + new Vector3(quarter, quarter, quarter));
+            children[4] = new OctreeNode<T>(newLength, minSize, center + new Vector3(-quarter, -quarter, -quarter));
+            children[5] = new OctreeNode<T>(newLength, minSize, center + new Vector3(quarter, -quarter, -quarter));
+            children[6] = new OctreeNode<T>(newLength, minSize, center + new Vector3(-quarter, -quarter, quarter));
+            children[7] = new OctreeNode<T>(newLength, minSize, center + new Vector3(quarter, -quarter, quarter));
         }
 
         private OctreeNode<T> FindChild(Vector3 objPos)
         {
-            // Find which child the object is closest to based on where the
-            // object's center is located in relation to the octree's center
             var index = FindChildIndex(objPos);
             return children[index];
         }
 
         private int FindChildIndex(Vector3 objPos)
         {
-            return (objPos.x <= Center.x ? 0 : 1) + (objPos.y >= Center.y ? 0 : 4) + (objPos.z <= Center.z ? 0 : 2);
+            // Find which child the object is closest to based on where the
+            // object's center is located in relation to the octree's center
+            var center = Bounds.center;
+            return (objPos.x <= center.x ? 0 : 1) + (objPos.y >= center.y ? 0 : 4) + (objPos.z <= center.z ? 0 : 2);
         }
     }
 }

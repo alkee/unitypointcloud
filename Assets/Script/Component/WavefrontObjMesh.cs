@@ -46,34 +46,34 @@ namespace upc.Component
             var group = objFile.DefaultGroup;
             if (group != null)
             {
-                var obj = CreateMesh(vertices, normals, group, defaultMaterial, transform, lhsSourceCoordination);
+                var obj = CreateMeshObject(vertices, normals, group, defaultMaterial, transform, lhsSourceCoordination);
             }
 
             // TODO: group mesh 지원
         }
 
-        private static int[] CreateVertexIndecies(in Vector3[] vertices, ObjGroup group, bool flipFace)
+        private static int[] CreateVertexIndices(ObjGroup group, bool flipFace)
         {
-            var triangleIndecies = new List<int>();
+            var triangleIndices = new List<int>();
             foreach (var f in group.Faces)
             {
                 // 기준점
-                triangleIndecies.Add(f.Vertices[0].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
+                triangleIndices.Add(f.Vertices[0].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
 
                 // face 의 flipping 은 face index 순서를 바꾸는 것. : https://youtu.be/eJEpeUH1EMg?t=196
                 int step = flipFace ? -1 : 1;
                 int index = flipFace ? f.Vertices.Count - 1 : 1;
                 while (index > 0 && index < f.Vertices.Count)
                 {
-                    triangleIndecies.Add(f.Vertices[index].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
+                    triangleIndices.Add(f.Vertices[index].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
                     index += step;
                 }
                 // TODO: uv (texture) 지원
             }
-            return triangleIndecies.ToArray();
+            return triangleIndices.ToArray();
         }
 
-        private static GameObject CreateMesh(in Vector3[] vertices, in Vector3[] normals, ObjGroup group, Material material, Transform parent, bool flipFace)
+        private static GameObject CreateMeshObject(in Vector3[] vertices, in Vector3[] normals, ObjGroup group, Material material, Transform parent, bool flipFace)
         {
             var obj = new GameObject(group.Name ?? "unnamed");
 
@@ -82,7 +82,7 @@ namespace upc.Component
             var mesh = mf.mesh;
             mesh.vertices = vertices;
             mesh.normals = normals;
-            mesh.triangles = CreateVertexIndecies(vertices, group, flipFace);
+            mesh.triangles = CreateVertexIndices(group, flipFace);
 
             // mesh renderer setup
             var mr = obj.AddComponent<MeshRenderer>();
