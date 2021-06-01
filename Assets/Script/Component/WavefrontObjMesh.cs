@@ -15,7 +15,6 @@ namespace upc.Component
         [Header("Defaults")]
         public Shader diffuseShader;
 
-
         public void Clear()
         {
             foreach (Transform t in transform) Destroy(t.gameObject);

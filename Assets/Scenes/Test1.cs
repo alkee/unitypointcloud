@@ -4,7 +4,8 @@ using UnityEngine;
 using upc;
 using upc.Component;
 
-public class Test1 : MonoBehaviour
+public class Test1
+    : MonoBehaviour
 {
     private WavefrontObjMesh obj;
     private PointCloudRenderer pcr;
@@ -60,9 +61,9 @@ public class Test1 : MonoBehaviour
         var gradient = new Gradient();
 
         // Populate the color keys at the relative time 0 and 1 (0 and 100%)
-        var colorKeys = new GradientColorKey[] { 
+        var colorKeys = new GradientColorKey[] {
             new GradientColorKey { color = Color.blue, time = 0.0f },
-            new GradientColorKey { color = Color.green, time = 0.3f },
+            new GradientColorKey { color = Color.green, time = 0.4f },
             new GradientColorKey { color = Color.yellow, time = 0.6f },
             new GradientColorKey { color = Color.red, time = 1.0f },
         };

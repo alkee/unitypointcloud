@@ -11,6 +11,7 @@ namespace upc
         public Vector3[] Points { get; private set; }
         public Vector3[] Normals { get; private set; }
         public Bounds Bounds { get; private set; }
+        public int[] Faces { get; private set; }
 
         public Dictionary<string, float[]> ScalarValues { get; private set; } = new Dictionary<string, float[]>();
         private readonly Octree<int> octree;
@@ -20,6 +21,7 @@ namespace upc
             Points = src.vertices;
             Count = Points.Length;
             Normals = src.normals;
+            Faces = src.triangles;
             Bounds = src.bounds;
             if (Normals == null || Normals.Length != Count)
             {

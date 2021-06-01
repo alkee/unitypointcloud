@@ -50,7 +50,7 @@ namespace upc.Component
             Colors = new Color[src.Count];
 
             // renderer setup
-            if (!pointCloudShader) pointCloudShader = Shader.Find("Particles/Standard Unlit");
+            if (!pointCloudShader) pointCloudShader = Shader.Find("PointCloud/VertexColor");
             mr.material = new Material(pointCloudShader);
         }
     }
