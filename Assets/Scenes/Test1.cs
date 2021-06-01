@@ -18,6 +18,16 @@ public class Test1
         pcr = FindObjectOfType<PointCloudRenderer>(true); Debug.Assert(pcr);
     }
 
+    public void OpenFile()
+    {
+        var filename = WinApi.FileOpenDialog("", "Load mesh", false
+            , new WinApi.FileOpenDialogFilter[] { new WinApi.FileOpenDialogFilter("WaveFront obj", "*.obj") });
+        if (filename == null) return; // canceled
+
+        Debug.Log($"opening file : {filename}");
+        obj.Load(filename);
+    }
+
     public void Test()
     {
         obj.gameObject.SetActive(false);
