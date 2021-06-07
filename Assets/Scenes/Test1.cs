@@ -1,5 +1,4 @@
-﻿using MathNet.Numerics.LinearAlgebra;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using UnityEngine;
 using upc;
 using upc.Component;
@@ -25,12 +24,15 @@ public class Test1
         if (filename == null) return; // canceled
 
         Debug.Log($"opening file : {filename}");
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
         obj.Load(filename);
     }
 
     public void Test()
     {
         obj.gameObject.SetActive(false);
+        pcr.gameObject.SetActive(true);
         var mesh = obj.GetComponentInChildren<MeshFilter>().mesh; // TODO: 2 개 이상의 submesh 존재하는 경우 처리
         pc = new PointCloud(mesh);
         pcr.Setup(pc);
@@ -51,13 +53,10 @@ public class Test1
                 var p = pc.Points[i];
                 var neighborIndices = pc.GetPointIndices(p, radius);
                 if (neighborIndices.Count < 3) { values[i] = float.NaN; return; }
-                var neighbors = pc.GetPoints(neighborIndices);
-                var center = neighbors.GetMeanVector();
 
-                var mat = Matrix<float>.Build.Dense(3, neighbors.Count, (r, c) => neighbors[c][r]);
-                var svd = mat.Svd();
-                var normal = new Vector3(svd.U.Column(2)[0], svd.U.Column(2)[1], svd.U.Column(2)[2]);
-                var plane = new Plane(normal, center);
+                var neighbors = pc.GetPoints(neighborIndices);
+                var plane = AnalysisTools.GetBestFittingPlane(neighbors);
+
                 var distance = Mathf.Abs(plane.GetDistanceToPoint(p));
                 if (min > distance) min = distance;
                 else if (max < distance) max = distance;
@@ -95,7 +94,7 @@ public class Test1
         pcr.ApplyColors();
     }
 
-    private void PlaneTest1()
+    public void Test3()
     {
         var samplIndex = 20000;
         var p = pc.Points[samplIndex];
@@ -107,15 +106,13 @@ public class Test1
         pcr.ApplyColors();
 
         // find bestfitting plane
-        var mat = Matrix<float>.Build.Dense(3, points.Count, (r, c) => points[c][r]);
-        var svd = mat.Svd();
-        var normal = new Vector3(svd.U.Column(2)[0], svd.U.Column(2)[1], svd.U.Column(2)[2]);
+        var plane = AnalysisTools.GetBestFittingPlane(points);
         var pos = points.GetMeanVector();
 
         // visualize the plane
         var go = GameObject.CreatePrimitive(PrimitiveType.Plane);
         go.GetComponent<MeshRenderer>().material.doubleSidedGI = true;
-        go.transform.up = normal;
+        go.transform.up = plane.normal;
         go.transform.position = pos;
     }
 }

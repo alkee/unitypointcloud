@@ -39,8 +39,11 @@ namespace upc.Component
         {
             this.src = src;
 
-            mf.mesh.vertices = src.Points;
-            mf.mesh.normals = src.Normals;
+            mf.mesh = new Mesh
+            {
+                vertices = src.Points,
+                normals = src.Normals
+            };
 
             var indices = new int[src.Count];
             for (var i = 0; i < indices.Length; ++i) indices[i] = i;
