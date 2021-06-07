@@ -193,7 +193,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Find best fitting plane
+  m_Text: Calculate Normal change rate
 --- !u!222 &13884887
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1150,7 +1150,7 @@ GameObject:
   - component: {fileID: 1344032741}
   - component: {fileID: 1344032740}
   m_Layer: 5
-  m_Name: Button - BestFittingPlane
+  m_Name: Button - Normal change rate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
