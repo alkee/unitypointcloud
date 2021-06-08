@@ -80,7 +80,27 @@ namespace upc.Component
             var mf = obj.AddComponent<MeshFilter>();
             var mesh = mf.mesh;
             mesh.vertices = vertices;
-            mesh.normals = normals;
+            if (vertices.Length == normals.Length)
+            {
+                mesh.normals = normals;
+            }
+            else
+            {
+                Debug.LogWarning($"{obj.name} loading... vertices Count :{vertices.Length}, normal Count:{normals.Length} mismatched");
+                var newNormals = new Vector3[vertices.Length];
+                for (var i = 0; i < newNormals.Length; ++i)
+                {
+                    if (i < normals.Length)
+                    {
+                        newNormals[i] = normals[i];
+                    }
+                    else
+                    {
+                        newNormals[i] = Vector3.up;
+                    }
+                }
+                mesh.normals = newNormals;
+            }
             mesh.triangles = CreateVertexIndices(group, flipFace);
 
             // mesh renderer setup

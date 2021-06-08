@@ -1,5 +1,6 @@
 ﻿using Emgu.CV;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -9,6 +10,25 @@ namespace upc
 
     public static class EmguCV
     {
+        public static Mat CreateMat(IEnumerable<Vector3> from, bool fixRowSize = true)
+        {
+            var count = from.Count();
+            var src = new float[count * 3];
+
+            var i = 0;
+            foreach (var f in from)
+            {
+                src[i++] = f.x;
+                src[i++] = f.y;
+                src[i++] = f.z;
+            }
+
+            var mat = new Mat(count, 3, Emgu.CV.CvEnum.DepthType.Cv32F, 1);
+            Marshal.Copy(src, 0, mat.DataPointer, src.Length);
+            if (fixRowSize) return mat.T();
+            return mat;
+        }
+
         public static Mat ComputeSvdU(this Mat mat, Emgu.CV.CvEnum.SvdFlag flag = Emgu.CV.CvEnum.SvdFlag.Default)
         {
             var svdW = new Mat();
