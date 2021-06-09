@@ -13,7 +13,6 @@ namespace upc
         public Bounds Bounds { get; private set; }
         public int[] Faces { get; private set; }
 
-        public Dictionary<string, float[]> ScalarValues { get; private set; } = new Dictionary<string, float[]>();
         private readonly Octree<int> octree;
 
         public PointCloud(Mesh src)
@@ -62,6 +61,48 @@ namespace upc
         {
             if (octree == null) return;
             octree.DrawAllBounds();
+        }
+    }
+
+    public class ScalarValues
+    {
+        public float[] Values { get; private set; }
+        public float EffectiveCount { get; private set; } // NaN excluded
+        public float Min { get; private set; }
+        public float Max { get; private set; }
+        public float Mean { get; private set; }
+        public float Variance { get; private set; }
+
+        public ScalarValues(float[] src)
+        {
+            if (src is null) throw new ArgumentNullException(nameof(src));
+            if (src.Length == 0) throw new ArgumentException("0 size of array", nameof(src));
+
+            Values = src;
+            Min = float.MaxValue;
+            Max = float.MinValue;
+            var sum = 0.0f;
+            var nanCount = 0;
+            for (var i = 0; i < src.Length; ++i)
+            {
+                var val = src[i];
+                if (float.IsNaN(val)) { ++nanCount; continue; }
+                sum += val;
+                if (val > Max) Max = val;
+                if (val < Min) Min = val;
+            }
+            if (nanCount == src.Length) throw new ArgumentException($"all NaN array({src.Length})", nameof(src));
+            EffectiveCount = src.Length - nanCount;
+            Mean = sum / EffectiveCount;
+
+            sum = 0.0f;
+            for (var i = 0; i < src.Length; ++i)
+            {
+                var val = src[i];
+                if (float.IsNaN(val)) continue;
+                sum += (val - Mean) * (val - Mean);
+            }
+            Variance = sum / EffectiveCount;
         }
     }
 }

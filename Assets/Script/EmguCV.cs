@@ -29,6 +29,14 @@ namespace upc
             return mat;
         }
 
+        public static Mat CreateMat(float[] from, bool fixRowSize = true)
+        {
+            var mat = new Mat(from.Length, 1, Emgu.CV.CvEnum.DepthType.Cv32F, 1);
+            Marshal.Copy(from, 0, mat.DataPointer, from.Length);
+            if (fixRowSize) return mat.T();
+            return mat;
+        }
+
         public static Mat ComputeSvdU(this Mat mat, Emgu.CV.CvEnum.SvdFlag flag = Emgu.CV.CvEnum.SvdFlag.Default)
         {
             var svdW = new Mat();
