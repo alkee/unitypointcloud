@@ -1411,6 +1411,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   lineContainer: {fileID: 408103673}
+  drawSvdPlaneVectors: 0
 --- !u!4 &1396186865
 Transform:
   m_ObjectHideFlags: 0

@@ -1,4 +1,6 @@
 ﻿using Emgu.CV;
+using Emgu.CV.CvEnum;
+using Emgu.CV.Structure;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -23,7 +25,7 @@ namespace upc
                 src[i++] = f.z;
             }
 
-            var mat = new Mat(count, 3, Emgu.CV.CvEnum.DepthType.Cv32F, 1);
+            var mat = new Mat(count, 3, DepthType.Cv32F, 1);
             Marshal.Copy(src, 0, mat.DataPointer, src.Length);
             if (fixRowSize) return mat.T();
             return mat;
@@ -31,19 +33,28 @@ namespace upc
 
         public static Mat CreateMat(float[] from, bool fixRowSize = true)
         {
-            var mat = new Mat(from.Length, 1, Emgu.CV.CvEnum.DepthType.Cv32F, 1);
+            var mat = new Mat(from.Length, 1, DepthType.Cv32F, 1);
             Marshal.Copy(from, 0, mat.DataPointer, from.Length);
             if (fixRowSize) return mat.T();
             return mat;
         }
 
-        public static Mat ComputeSvdU(this Mat mat, Emgu.CV.CvEnum.SvdFlag flag = Emgu.CV.CvEnum.SvdFlag.Default)
+        public static (Mat W, Mat U, Mat V) ComputeSvd(this Mat mat, SvdFlag flag = SvdFlag.Default)
         {
             var svdW = new Mat();
             var svdU = new Mat();
             var svdV = new Mat();
             CvInvoke.SVDecomp(mat, svdW, svdU, svdV, flag);
-            return svdU;
+            return (svdW, svdU, svdV);
+        }
+
+        public static (double variance, Matrix<int> labels, Mat centers) Kmeans(this Mat samples, int clusterCount, MCvTermCriteria criteria, int attempts = 5, KMeansInitType flag = KMeansInitType.PPCenters)
+        { // https://deep-learning-study.tistory.com/292
+            var outBestLabels = new Matrix<int>(samples.Rows, 1); // label 은 int 여야 한다.
+            var outCenters = new Mat();
+            var variance = CvInvoke.Kmeans(samples, clusterCount, outBestLabels, criteria, attempts, flag, outCenters);
+
+            return (variance, outBestLabels, outCenters);
         }
 
         #region Set/Get float element
@@ -66,25 +77,36 @@ namespace upc
 
         // col 위치에 각 row 방향으로.. (row 셋팅하고 Transpose 하는 게 효율적이긴 할텐데..)
 
-        public static Vector3 GetVector3(this Mat mat, int col)
+        public static Vector3 GetRowVector3(this Mat mat, int col)
         {
+            Debug.Assert(mat.Rows == 3);
             return new Vector3
                 (mat.GetFloatValue(col, 0)
                 , mat.GetFloatValue(col, 1)
                 , mat.GetFloatValue(col, 2));
         }
 
-        public static void SetVector3(this Mat mat, int col, Vector3 val)
+        public static Vector3 GetVector3(this Mat mat, int row)
         {
+            Debug.Assert(mat.Cols == 3);
+            var value = new float[3];
+            Marshal.Copy(mat.DataPointer + (row * mat.Cols) * mat.ElementSize, value, 0, value.Length);
+            return new Vector3(value[0], value[1], value[2]);
+        }
+
+        public static void SetRowVector3(this Mat mat, int col, Vector3 val)
+        {
+            Debug.Assert(mat.Rows == 3);
             SetFloatValue(mat, col, 0, val[0]);
             SetFloatValue(mat, col, 1, val[1]);
             SetFloatValue(mat, col, 2, val[2]);
         }
 
-        public static void SetVector3Values(this Mat mat, IEnumerable<Vector3> values)
+        public static void SetVector3(this Mat mat, int row, Vector3 val)
         {
-            var i = 0;
-            foreach (var val in values) mat.SetVector3(i++, val);
+            Debug.Assert(mat.Cols == 3);
+            var target = new float[] { val.x, val.y, val.z };
+            Marshal.Copy(target, 0, mat.DataPointer + (row * mat.Cols) * mat.ElementSize, target.Length);
         }
     }
 }

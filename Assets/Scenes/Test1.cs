@@ -46,6 +46,7 @@ public class Test1
         pcr.Setup(pc);
 
         if (drawSvdPlaneVectors) DrawSvdDirection();
+        ClearClusters();
     }
 
     public void Test2()
@@ -135,7 +136,7 @@ public class Test1
                 if (neighborIndices.Count < 4) { values[i] = float.NaN; return; }
 
                 var neighbors = pc.GetPoints(neighborIndices);
-                var normalChangeRate = AnalysisTools.NormalChangeRate(p, neighbors);
+                var normalChangeRate = AnalysisTools.NormalChangeRate(neighbors);
 
                 if (min > normalChangeRate) min = normalChangeRate;
                 else if (max < normalChangeRate) max = normalChangeRate;
@@ -173,11 +174,18 @@ public class Test1
             pcr.Colors[i] = gradient.Evaluate((v - min) / t);
         });
         pcr.ApplyColors();
-
     }
 
+    private List<GameObject> clusterCenters = new List<GameObject>();
+    private void ClearClusters()
+    {
+        foreach (var c in clusterCenters)
+            Destroy(c);
+    }
     public void Test4()
     {
+        ClearClusters();
+
         if (sv == null)
         {
             Debug.LogWarning("no scalar values");
@@ -200,27 +208,18 @@ public class Test1
         }
 
         // clustering by kmeans
-        var samples = EmguCV.CreateMat(points, false);
-        var criteria = new Emgu.CV.Structure.MCvTermCriteria
-        {
-            Epsilon = 0.01f,
-            MaxIter = 10,
-            Type = Emgu.CV.CvEnum.TermCritType.Eps | Emgu.CV.CvEnum.TermCritType.Iter // 두가지 조건중 하나라도 도달하면
-        };
-
-        var outBestLabels = new Emgu.CV.Matrix<int>(points.Count, 1); // label 은 int 여야 한다.
-        var outCenters = new Emgu.CV.Mat();
-
         const int CLUSTER_COUNT = 3; // 양쪽 귀 + 코
-        Emgu.CV.CvInvoke.Kmeans(samples, CLUSTER_COUNT, outBestLabels, criteria, 10, Emgu.CV.CvEnum.KMeansInitType.RandomCenters, outCenters);
+        var samples = EmguCV.CreateMat(points, false);
+        var criteria = new Emgu.CV.Structure.MCvTermCriteria(10, 0.01f); // 두가지 조건중 하나라도 도달하는 경우 완료
+        var (_, _, centers) = samples.Kmeans(CLUSTER_COUNT, criteria);
 
-        outCenters = outCenters.T(); // why ???
-        for (var i = 0; i < CLUSTER_COUNT; ++i)
+        for (var i = 0; i < centers.Rows; ++i)
         {
-            var pos = outCenters.GetVector3(i);
+            var pos = centers.GetVector3(i);
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
             marker.transform.localScale = Vector3.one * 0.01f;
             marker.transform.position = pos;
+            clusterCenters.Add(marker); // clear 하기위해 저장
         }
     }
 
@@ -254,15 +253,16 @@ public class Test1
         lineContainer.transform.position = center;
         var centered = pc.Points.Select(x => x - center);
         var mat = EmguCV.CreateMat(centered);
-        var svdU = mat.ComputeSvdU();
+        var svd = mat.ComputeSvd();
 
-        var v0 = svdU.GetVector3(0);
-        var v1 = svdU.GetVector3(1);
-        var v2 = svdU.GetVector3(2); // roughness
+        var v0 = svd.U.GetRowVector3(0);
+        var v1 = svd.U.GetRowVector3(1);
+        var v2 = svd.U.GetRowVector3(2); // roughness
         DrawDirectionLine(v0, Color.red);
         DrawDirectionLine(v1, Color.green);
         DrawDirectionLine(v2, Color.blue);
-
+        var sum = v0 * svd.W.GetFloatValue(0, 0) + v1 * svd.W.GetFloatValue(1, 0) + v2 * svd.W.GetFloatValue(2, 0);
+        DrawDirectionLine(sum, Color.magenta);
     }
 
     private void DrawDirectionLine(Vector3 dir, Color color)
