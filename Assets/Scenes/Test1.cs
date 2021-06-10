@@ -8,9 +8,6 @@ using upc.Component;
 public class Test1
     : MonoBehaviour
 {
-    public Transform lineContainer;
-    public bool drawSvdPlaneVectors;
-
     private WavefrontObjMesh obj;
     private PointCloudRenderer pcr;
 
@@ -25,7 +22,7 @@ public class Test1
         pcr = FindObjectOfType<PointCloudRenderer>(true); Debug.Assert(pcr);
     }
 
-    public void OpenFile()
+    private void OpenFile()
     {
         var filename = WinApi.FileOpenDialog("", "Load mesh", false
             , new WinApi.FileOpenDialogFilter[] { new WinApi.FileOpenDialogFilter("WaveFront obj", "*.obj") });
@@ -37,7 +34,12 @@ public class Test1
         obj.Load(filename);
     }
 
-    public void Test()
+    [Header("Pointclouds")]
+    public bool drawSvdPlaneVectors;
+    [aus.Property.ConditionalHide(nameof(drawSvdPlaneVectors))]
+    public Transform lineContainer;
+
+    private void CreatePointCloud()
     {
         obj.gameObject.SetActive(false);
         pcr.gameObject.SetActive(true);
@@ -46,8 +48,17 @@ public class Test1
         pcr.Setup(pc);
 
         if (drawSvdPlaneVectors) DrawSvdDirection();
-        ClearClusters();
     }
+
+    public void Test()
+    {
+        ClearClusters();
+        OpenFile();
+        CreatePointCloud();
+    }
+
+    [Header("Geometric features")]
+    public float radius = 0.03f;
 
     public void Test2()
     {
@@ -59,8 +70,6 @@ public class Test1
 
         var min = float.MaxValue;
         var max = float.MinValue;
-        //var radius = 0.006f;
-        var radius = 0.03f;
 
         var count = pc.Points.Length;
         var values = new float[count];
@@ -123,7 +132,6 @@ public class Test1
 
         var min = float.MaxValue;
         var max = float.MinValue;
-        var radius = 0.03f;
 
         var count = pc.Points.Length;
         var values = new float[count];
@@ -176,6 +184,9 @@ public class Test1
         pcr.ApplyColors();
     }
 
+    [Header("Clustering")]
+    public float meanWeight = 2.0f;
+
     private List<GameObject> clusterCenters = new List<GameObject>();
     private void ClearClusters()
     {
@@ -202,7 +213,7 @@ public class Test1
         for (var i = 0; i < pc.Points.Length; ++i)
         { // 평균값 이상의 point 들만 이용
             var val = sv.Values[i];
-            if (float.IsNaN(val) || val < sv.Mean) continue;
+            if (float.IsNaN(val) || val < (sv.Mean * meanWeight)) continue;
             var pos = pc.Points[i];
             points.Add(pos);
         }
