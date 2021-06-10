@@ -10,6 +10,7 @@ namespace upc.Component
     {
         [Header("Initial load settings")]
         public string sourceFilePath;
+
         public bool lhsSourceCoordination = true;
 
         [Header("Defaults")]
@@ -34,82 +35,49 @@ namespace upc.Component
 
             // build material
             var defaultMaterial = new Material(diffuseShader);
-            var materials = new Dictionary<string, Material> { { "default", defaultMaterial } };
+            //var materials = new Dictionary<string, Material> { { "default", defaultMaterial } };
             // TODO: objFile.MaterialLibraries support
 
+            // TODO: group mesh/sub mesh 지원
+            CreateMeshObject(objFile, defaultMaterial, transform, lhsSourceCoordination);
+        }
+
+        private static GameObject CreateMeshObject(ObjFile source, Material defaultMaterial, Transform parent, bool lhsSourceCoordination)
+        {
+            // prepare data
             var lhs = lhsSourceCoordination ? -1 : 1;
-            var vertices = objFile.Vertices.Select(v => new Vector3(v.Position.X * lhs, v.Position.Y, v.Position.Z)).ToArray();
-            var normals = objFile.VertexNormals?.Select(n => new Vector3(n.X * lhs, n.Y, n.Z)).ToArray();
-            // TODO: vertex color support
-
-            var group = objFile.DefaultGroup;
-            if (group != null)
+            var vertices = source.Vertices.Select(v => new Vector3(v.Position.X * lhs, v.Position.Y, v.Position.Z)).ToArray();
+            var normals = source.VertexNormals?.Select(n => new Vector3(n.X * lhs, n.Y, n.Z)).ToArray();
+            var faces = new List<int>();
+            foreach (var f in source.Faces)
             {
-                var obj = CreateMeshObject(vertices, normals, group, defaultMaterial, transform, lhsSourceCoordination);
-            }
-
-            // TODO: group mesh 지원
-        }
-
-        private static int[] CreateVertexIndices(ObjGroup group, bool flipFace)
-        {
-            var triangleIndices = new List<int>();
-            foreach (var f in group.Faces)
-            {
-                // 기준점
-                triangleIndices.Add(f.Vertices[0].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
-
                 // face 의 flipping 은 face index 순서를 바꾸는 것. : https://youtu.be/eJEpeUH1EMg?t=196
-                int step = flipFace ? -1 : 1;
-                int index = flipFace ? f.Vertices.Count - 1 : 1;
-                while (index > 0 && index < f.Vertices.Count)
-                {
-                    triangleIndices.Add(f.Vertices[index].Vertex - 1); // .obj 내에서는 index 가 1 부터시작
-                    index += step;
-                }
-                // TODO: uv (texture) 지원
+                for (var i = lhsSourceCoordination ? 2 : 0; i >= 0 && i < 3; i += lhs)
+                    faces.Add(f.Vertices[i].Vertex - 1); // wavefront .obj 의 index 는 1 부터 시작.
             }
-            return triangleIndices.ToArray();
-        }
 
-        private static GameObject CreateMeshObject(in Vector3[] vertices, in Vector3[] normals, ObjGroup group, Material material, Transform parent, bool flipFace)
-        {
-            var obj = new GameObject(group.Name ?? "unnamed");
+            var obj = new GameObject("obj mesh");
+            obj.transform.parent = parent;
 
             // mesh filter setup
             var mf = obj.AddComponent<MeshFilter>();
             var mesh = mf.mesh;
             mesh.vertices = vertices;
-            if (vertices.Length == normals.Length)
+            mesh.triangles = faces.ToArray();
+            if (normals.Length == vertices.Length)
             {
                 mesh.normals = normals;
             }
             else
             {
-                Debug.LogWarning($"{obj.name} loading... vertices Count :{vertices.Length}, normal Count:{normals.Length} mismatched");
-                var newNormals = new Vector3[vertices.Length];
-                for (var i = 0; i < newNormals.Length; ++i)
-                {
-                    if (i < normals.Length)
-                    {
-                        newNormals[i] = normals[i];
-                    }
-                    else
-                    {
-                        newNormals[i] = Vector3.up;
-                    }
-                }
-                mesh.normals = newNormals;
+                Debug.LogWarning($"normal count dismatched. vertices : {vertices.Length}, normals : {normals.Length}. recalculating ...");
+                mesh.RecalculateNormals();
             }
-            mesh.triangles = CreateVertexIndices(group, flipFace);
+            Debug.Log($"mesh created at {mesh.bounds:F4}, vertices: {vertices.Length}, faces: {faces.Count / 3}");
 
             // mesh renderer setup
             var mr = obj.AddComponent<MeshRenderer>();
-            mr.material = material;
-
-            // game object setup
-            obj.transform.parent = parent;
-            obj.transform.localPosition = Vector3.zero;
+            mr.material = defaultMaterial;
 
             return obj;
         }
