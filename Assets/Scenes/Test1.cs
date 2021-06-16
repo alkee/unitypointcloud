@@ -29,8 +29,6 @@ public class Test1
         if (filename == null) return; // canceled
 
         Debug.Log($"opening file : {filename}");
-        obj.gameObject.SetActive(true);
-        pcr.gameObject.SetActive(false);
         obj.Load(filename);
     }
 
@@ -41,11 +39,12 @@ public class Test1
 
     private void CreatePointCloud()
     {
-        obj.gameObject.SetActive(false);
-        pcr.gameObject.SetActive(true);
-        var mesh = obj.GetComponentInChildren<MeshFilter>().mesh; // TODO: 2 개 이상의 submesh 존재하는 경우 처리
+        var mesh = obj.DefaultMeshFilter.mesh; // TODO: 2 개 이상의 submesh 존재하는 경우 처리
         pc = new PointCloud(mesh);
         pcr.Setup(pc);
+
+        obj.gameObject.SetActive(false);
+        pcr.gameObject.SetActive(true);
 
         if (drawSvdPlaneVectors) DrawSvdDirection();
     }

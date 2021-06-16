@@ -16,9 +16,12 @@ namespace upc.Component
         [Header("Defaults")]
         public Shader diffuseShader;
 
+        public MeshFilter DefaultMeshFilter { get; private set; }
+
         public void Clear()
         {
             foreach (Transform t in transform) Destroy(t.gameObject);
+            DefaultMeshFilter = null;
         }
 
         public void Load()
@@ -27,7 +30,7 @@ namespace upc.Component
             Load(sourceFilePath, lhsSourceCoordination);
         }
 
-        public void Load(string sourceFilePath, bool lhsSourceCoordination = true)
+        public GameObject Load(string sourceFilePath, bool lhsSourceCoordination = true)
         {
             Clear();
 
@@ -39,7 +42,9 @@ namespace upc.Component
             // TODO: objFile.MaterialLibraries support
 
             // TODO: group mesh/sub mesh 지원
-            CreateMeshObject(objFile, defaultMaterial, transform, lhsSourceCoordination);
+            var gameObj = CreateMeshObject(objFile, defaultMaterial, transform, lhsSourceCoordination);
+            DefaultMeshFilter = gameObj.GetComponent<MeshFilter>();
+            return gameObj;
         }
 
         private static GameObject CreateMeshObject(ObjFile source, Material defaultMaterial, Transform parent, bool lhsSourceCoordination)

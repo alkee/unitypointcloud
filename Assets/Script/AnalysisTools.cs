@@ -18,26 +18,25 @@ namespace upc
             return new Plane(normal, center);
         }
 
-        public static float Roughness(Vector3 point, IEnumerable<Vector3> group)
+        public static float Roughness(Vector3 point, IEnumerable<Vector3> points)
         {
-            var count = group.Count();
+            var count = points.Count();
             if (count == 3) return 0;
-            var plane = GetBestFittingPlane(group);
+            var plane = GetBestFittingPlane(points);
             if (plane.HasValue == false) return float.NaN;
             return Mathf.Abs(plane.Value.GetDistanceToPoint(point));
         }
 
-        public static float NormalChangeRate(IEnumerable<Vector3> group)
+        public static float NormalChangeRate(IEnumerable<Vector3> points)
         { // ref : https://github.com/CloudCompare/CCCoreLib/blob/be52fc2f9981a80cd457cd914f44f17f6ebf04f1/src/Neighbourhood.cpp#L980-L1018
-            // min(L1,L2,L3) / L1 + L2 + L3
-            // 샘플 데이터들에서는 Surface variation(L3 / L1 + L2 + L3) 과 값이 같다??
+            // cloudcompare - Surface variation(L3 / (L1 + L2 + L3)) 과 값이 같다 (L3 는 eigen value 최소값이므로)
 
-            var count = group.Count();
+            var count = points.Count();
             if (count == 3) return 0;
             if (count < 3) return float.NaN;
 
-            var center = group.GetMeanVector();
-            var centered = group.Select(x => x - center);
+            var center = points.GetMeanVector();
+            var centered = points.Select(x => x - center);
             var mat = EmguCV.CreateMat(centered);
 
             var (W, U, _) = mat.ComputeSvd();
