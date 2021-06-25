@@ -52,5 +52,33 @@ namespace upc
             var min = Mathf.Min(eigenValue1, eigenValue2, eigenValue3);
             return min / sum;
         }
+
+        public static (float u, float v) EffectiveEnergy(Vector3 point, Vector3 normal, IEnumerable<Vector3> points)
+        { // https://www.sciencedirect.com/science/article/abs/pii/S0167865506000663?casa_token=6ec1yWFMLP0AAAAA:pSQjaDcgrO1M3tHA39DSzWCMcQqBga-4cry9liWmbzlb7OOKEQllWfl-xgVt2SKrp-ohsE9Y6Q
+            var count = points.Count();
+
+            //var center = points.GetMeanVector();
+            var sum = 0.0f;
+            foreach (var p in points)
+            {
+                var d = Vector3.Dot((point - p), normal);
+                sum += d;
+            }
+
+            // mean
+            var u = sum / count;
+
+            // variance
+            var vsum = 0.0f;
+            foreach (var p in points)
+            {
+                var d = Vector3.Dot((point - p), normal);
+                var s = (d - u) * (d - u);
+                vsum += s;
+            }
+            var v = vsum / count;
+
+            return (u, v);
+        }
     }
 }

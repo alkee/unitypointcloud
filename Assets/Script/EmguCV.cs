@@ -31,6 +31,25 @@ namespace upc
             return mat;
         }
 
+        public static Mat CreateMat(Texture2D tex)
+        {
+            var tmpFilePath = Application.temporaryCachePath + "/stupid.png";
+            var png = tex.EncodeToPNG();
+            System.IO.File.WriteAllBytes(tmpFilePath, png);
+
+            return new Mat(tmpFilePath);
+        }
+
+        public static (DepthType type, int channels) GetTypeAndChannel(Texture2D tex)
+        {
+            switch(tex.format)
+            {
+                case TextureFormat.Alpha8: return (DepthType.Cv8U, 1);
+            }
+            throw new System.NotSupportedException($"not supported data format : {tex.format}" );
+        }
+
+
         public static Mat CreateMat(float[] from, bool fixRowSize = true)
         {
             var mat = new Mat(from.Length, 1, DepthType.Cv32F, 1);

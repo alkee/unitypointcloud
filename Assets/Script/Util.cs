@@ -231,5 +231,38 @@ namespace upc
             foreach (var p in points) sum += p;
             return sum / count;
         }
+
+        public static Texture2D Render(this Camera cam, int width, int height, RenderTextureFormat format)
+        {
+            const int RENDER_TEXTURE_DEPTH_BITS = 16; // https://docs.unity3d.com/ScriptReference/RenderTexture-ctor.html
+            var rt = new RenderTexture(width, height, RENDER_TEXTURE_DEPTH_BITS, format);
+
+            var prevRt = RenderTexture.active;
+            var prevTarget = cam.targetTexture;
+
+            cam.targetTexture = rt;
+            cam.Render();
+
+            var tex2d = new Texture2D(width, height, TextureFormat.RGB24, false);
+            RenderTexture.active = rt;
+            tex2d.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            tex2d.Apply();
+
+            cam.targetTexture = prevTarget;
+            RenderTexture.active = prevRt;
+            return tex2d;
+        }
+
+        public static Texture2D DrawRect(this Texture2D tex, RectInt rct, Color color)
+        {
+            for (var y = rct.yMin; y < rct.yMax; ++y)
+            {
+                for (var x = rct.xMin; x < rct.xMax; ++x)
+                {
+                    tex.SetPixel(x, y, Color.Lerp(tex.GetPixel(x, y), color, color.a)); // blend
+                }
+            }
+            return tex;
+        }
     }
 }

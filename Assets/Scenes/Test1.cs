@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -49,6 +50,37 @@ public class Test1
         if (drawSvdPlaneVectors) DrawSvdDirection();
     }
 
+    private static void ColorizeScalarField(PointCloudRenderer target, ScalarValues sv, Func<int, float, float> filter = null)
+    {
+        if (filter == null) filter = (i, x) => x;
+        var gradient = new Gradient();
+
+        // Populate the color keys at the relative time 0 and 1 (0 and 100%)
+        var colorKeys = new GradientColorKey[] {
+            new GradientColorKey { color = Color.blue, time = 0.0f },
+            new GradientColorKey { color = Color.green, time = 0.4f },
+            new GradientColorKey { color = Color.yellow, time = 0.6f },
+            new GradientColorKey { color = Color.red, time = 1.0f },
+        };
+        var alphaKeys = new GradientAlphaKey[]
+        {
+            new GradientAlphaKey { alpha = 1.0f, time = 0.0f },
+            new GradientAlphaKey { alpha = 1.0f, time = 1.0f },
+        };
+
+        gradient.SetKeys(colorKeys, alphaKeys);
+
+        var t = sv.Max - sv.Min;
+        if (t == 0) { Debug.LogError($"same values of roughness{sv.Min}"); return; }
+        Parallel.For(0, sv.Values.Length, (i) =>
+        {
+            var v = filter(i, sv.Values[i]);
+            if (float.IsNaN(v)) { target.Colors[i] = Color.black; return; }
+            target.Colors[i] = gradient.Evaluate((v - sv.Min) / t);
+        });
+        target.ApplyColors();
+    }
+
     public void Test()
     {
         ClearClusters();
@@ -93,32 +125,7 @@ public class Test1
         sv = new ScalarValues(values);
 
         // visualize
-        var gradient = new Gradient();
-
-        // Populate the color keys at the relative time 0 and 1 (0 and 100%)
-        var colorKeys = new GradientColorKey[] {
-            new GradientColorKey { color = Color.blue, time = 0.0f },
-            new GradientColorKey { color = Color.green, time = 0.4f },
-            new GradientColorKey { color = Color.yellow, time = 0.6f },
-            new GradientColorKey { color = Color.red, time = 1.0f },
-        };
-        var alphaKeys = new GradientAlphaKey[]
-        {
-            new GradientAlphaKey { alpha = 1.0f, time = 0.0f },
-            new GradientAlphaKey { alpha = 1.0f, time = 1.0f },
-        };
-
-        gradient.SetKeys(colorKeys, alphaKeys);
-
-        var t = max - min;
-        if (t == 0) { Debug.LogError($"same values of roughness{min}"); return; }
-        Parallel.For(0, count, (i) =>
-        {
-            var v = values[i];
-            if (float.IsNaN(v)) { pcr.Colors[i] = Color.black; return; }
-            pcr.Colors[i] = gradient.Evaluate((v - min) / t);
-        });
-        pcr.ApplyColors();
+        ColorizeScalarField(pcr, sv);
     }
 
     public void Test3()
@@ -155,33 +162,49 @@ public class Test1
         sv = new ScalarValues(values);
 
         // visualize
-        var gradient = new Gradient();
-
-        // Populate the color keys at the relative time 0 and 1 (0 and 100%)
-        var colorKeys = new GradientColorKey[] {
-            new GradientColorKey { color = Color.blue, time = 0.0f },
-            new GradientColorKey { color = Color.green, time = 0.33f },
-            new GradientColorKey { color = Color.yellow, time = 0.66f },
-            new GradientColorKey { color = Color.red, time = 1.0f },
-        };
-        var alphaKeys = new GradientAlphaKey[]
-        {
-            new GradientAlphaKey { alpha = 1.0f, time = 0.0f },
-            new GradientAlphaKey { alpha = 1.0f, time = 1.0f },
-        };
-
-        gradient.SetKeys(colorKeys, alphaKeys);
-
-        var t = max - min;
-        if (t == 0) { Debug.LogError($"same values of normal change rate{min}"); return; }
-        Parallel.For(0, count, (i) =>
-        {
-            var v = values[i];
-            if (float.IsNaN(v)) { pcr.Colors[i] = Color.black; return; }
-            pcr.Colors[i] = gradient.Evaluate((v - min) / t);
-        });
-        pcr.ApplyColors();
+        ColorizeScalarField(pcr, sv);
     }
+
+    public void CalculateEffectiveEnergy()
+    {
+        if (pc == null)
+        {
+            Debug.LogWarning("NO point cloud data");
+            return;
+        }
+
+        var min = float.MaxValue;
+        var max = float.MinValue;
+
+        var count = pc.Points.Length;
+        var values = new float[count];
+        using (new ElapsedTimeLogger("calculating Effective Energy"))
+        {
+            Parallel.For(0, count, (i) =>
+            {
+                var p = pc.Points[i];
+                var neighborIndices = pc.GetPointIndices(p, radius);
+
+                var neighbors = pc.GetPoints(neighborIndices);
+                var eeS = AnalysisTools.EffectiveEnergy(p, pc.Normals[i], neighbors);
+                var ee = eeS.u * eeS.u * eeS.v;
+                if (eeS.u < 0) ee *= 4.0f;
+                //var d = (pc.Bounds.center - p).sqrMagnitude;
+                //ee *= 1 / d;
+
+                if (min > ee) min = ee;
+                else if (max < ee) max = ee;
+                values[i] = ee;
+            }
+            );
+        }
+        Debug.Log($"Effective energy : min={min}, max={max}");
+        sv = new ScalarValues(values);
+
+        // visualize
+        ColorizeScalarField(pcr, sv);
+    }
+
 
     [Header("Clustering")]
     public float meanWeight = 2.0f;
@@ -223,6 +246,8 @@ public class Test1
         var criteria = new Emgu.CV.Structure.MCvTermCriteria(10, 0.01f); // 두가지 조건중 하나라도 도달하는 경우 완료
         var (_, _, centers) = samples.Kmeans(CLUSTER_COUNT, criteria);
 
+        // visualize
+        ColorizeScalarField(pcr, sv, (i, v) => v < (sv.Mean * meanWeight) ? float.NaN : v);
         for (var i = 0; i < centers.Rows; ++i)
         {
             var pos = centers.GetVector3(i);
@@ -285,4 +310,50 @@ public class Test1
         line.transform.parent = lineContainer;
         line.useWorldSpace = false;
     }
+
+    [Header("CascadeClassifier")]
+    public UnityEngine.UI.RawImage imageTarget;
+    public string classifierFilename;
+
+    public void Test5()
+    {
+        if (System.IO.File.Exists(classifierFilename) == false)
+        {
+            Debug.LogWarning($"file not found : {classifierFilename}");
+            return;
+        }
+
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
+
+        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
+        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
+
+        var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
+        var mat = EmguCV.CreateMat(tex);
+
+        var c = new Emgu.CV.CascadeClassifier(classifierFilename);
+        var rs = c.DetectMultiScale(mat);
+        if (rs.Length == 0) Debug.LogWarning("no feature detected");
+
+        foreach (var r in rs)
+        {
+            // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
+            var rect = new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height);
+            Debug.Log($"(x={r.X}, y={r.Y}, w={r.Width}, h={r.Height} ==> to {rect}");
+            tex.DrawRect(rect, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+        }
+        tex.Apply();
+
+        // visualize
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
+    //private static Vector3 Opencv2DposTo3Dpos(int x, int y, int textureWidth, int textureHeight, Camera cam)
+    //{
+    //    var px = x / (float)textureWidth;
+    //    var py = y / (float)textureHeight;
+
+    //}
 }
