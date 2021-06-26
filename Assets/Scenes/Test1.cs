@@ -258,6 +258,12 @@ public class Test1
         }
     }
 
+    public void Test5()
+    {
+        Dnn();
+    }
+
+
     private void ClearLines()
     {
         foreach (Transform t in lineContainer.transform)
@@ -315,7 +321,7 @@ public class Test1
     public UnityEngine.UI.RawImage imageTarget;
     public string classifierFilename;
 
-    public void Test5()
+    private void CascadeClassifier()
     {
         if (System.IO.File.Exists(classifierFilename) == false)
         {
@@ -330,7 +336,7 @@ public class Test1
         imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
 
         var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
-        var mat = EmguCV.CreateMat(tex);
+        var mat = EmguCV.CreateCvImage(tex);
 
         var c = new Emgu.CV.CascadeClassifier(classifierFilename);
         var rs = c.DetectMultiScale(mat);
@@ -349,6 +355,88 @@ public class Test1
         imageTarget.texture = tex;
         imageTarget.gameObject.SetActive(true);
     }
+
+    [Header("Dnn")]
+    public string modelProtoTxt; // deploy.prototxt
+    public string caffeModel; // res10_300x300_ssd_iter_140000.caffemodel
+
+    private void Dnn()
+    {
+        // https://www.pyimagesearch.com/2018/02/26/face-detection-with-opencv-and-deep-learning/
+        // https://github.com/emgucv/emgucv/blob/7b824371fd93f37296efa073c56d399f57d178d6/Emgu.CV.Test/AutoTestVarious.cs#L3681
+        if (System.IO.File.Exists(modelProtoTxt) == false)
+        {
+            Debug.LogWarning($"file not found : {modelProtoTxt}");
+            return;
+        }
+        if (System.IO.File.Exists(caffeModel) == false)
+        {
+            Debug.LogWarning($"file not found : {caffeModel}");
+            return;
+        }
+
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
+
+        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
+        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
+
+        var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
+        var img = EmguCV.CreateCvImage(tex);
+
+        Debug.Log($"image size = {img.Size}, dim = {img.Mat.Dims}, channel = {img.NumberOfChannels}, elementSize = {img.Mat.ElementSize}");
+
+        var net = Emgu.CV.Dnn.DnnInvoke.ReadNetFromCaffe(modelProtoTxt, caffeModel);
+        var blob = Emgu.CV.Dnn.DnnInvoke.BlobFromImage(img);
+        net.SetInput(blob, "data");
+        
+        var detections = net.Forward();
+
+        var confidenceThreshold = 0.5f;
+        var rects = new List<RectInt>();
+
+        var dimSizes = detections.SizeOfDimension;
+        var step = dimSizes[3] * sizeof(float);
+        var start = detections.DataPointer;
+
+        for(var i=0;i<dimSizes[2]; i++)
+        {
+            var values = new float[dimSizes[3]];
+            System.Runtime.InteropServices.Marshal.Copy(new IntPtr(start.ToInt64() + step * i), values, 0, dimSizes[3]);
+            var confident = values[2];
+            if (confident < confidenceThreshold) continue;
+
+            float xLeftBottom = values[3] * img.Rows;
+            float yLeftBottom = values[4] * img.Cols;
+            float xRightTop = values[5] * img.Rows;
+            float yRightTop = values[6] * img.Cols;
+
+            int xMin = Mathf.RoundToInt(xLeftBottom);
+            int yMin = Mathf.RoundToInt(yLeftBottom);
+            int width = Mathf.RoundToInt(xRightTop - xLeftBottom);
+            int height = Mathf.RoundToInt(yRightTop - yLeftBottom);
+
+            // Texture2D 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
+            //var faceRegion = new RectInt(xMin, yMin, width, height);
+            var faceRegion = new RectInt(xMin, img.Cols - yMin - height, width, height);
+
+            Debug.Log($"{values[0]} {values[1]} c:{values[2]} / {values[3]}, {values[4]}, {values[5]}, {values[6]} => {faceRegion:F4}");
+
+
+            rects.Add(faceRegion);
+        }
+
+        foreach (var r in rects)
+        {
+            tex.DrawRect(r, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+        }
+
+        // visualize
+        tex.Apply();
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
 
     //private static Vector3 Opencv2DposTo3Dpos(int x, int y, int textureWidth, int textureHeight, Camera cam)
     //{

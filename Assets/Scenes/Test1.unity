@@ -1569,6 +1569,8 @@ MonoBehaviour:
   meanWeight: 2
   imageTarget: {fileID: 1371825857}
   classifierFilename: D:\Downloads\haarcascade_mcs_nose.xml
+  modelProtoTxt: D:\Downloads\deploy.prototxt
+  caffeModel: D:\Downloads\res10_300x300_ssd_iter_140000.caffemodel
 --- !u!4 &1396186865
 Transform:
   m_ObjectHideFlags: 0
