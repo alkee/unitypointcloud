@@ -31,7 +31,7 @@ namespace upc
             return mat;
         }
 
-        public static Image<Bgr, byte> CreateCvImage(Texture2D tex)
+        public static Image<Bgr, byte> CreateCvImage(this Texture2D tex)
         {
             var tmpFilePath = Application.temporaryCachePath + "/stupid.png";
             var png = tex.EncodeToPNG();
@@ -39,6 +39,17 @@ namespace upc
             var img = new Image<Bgr, byte>(tmpFilePath);
             return img;
         }
+
+        public static Texture2D CreateTexture(this Image<Bgr, byte> img)
+        {
+            var tmpFilePath = Application.temporaryCachePath + "/stupid.png";
+            img.Save(tmpFilePath);
+            var tex = new Texture2D(img.Width, img.Height);
+            tex.LoadImage(System.IO.File.ReadAllBytes(tmpFilePath));
+            return tex;
+        }
+
+
 
         public static (DepthType type, int channels) GetTypeAndChannel(Texture2D tex)
         {

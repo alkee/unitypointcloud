@@ -264,5 +264,11 @@ namespace upc
             }
             return tex;
         }
+
+        public static Texture2D DrawPoint(this Texture2D tex, int x, int y, Color color)
+        {
+            tex.SetPixel(x, y, Color.Lerp(tex.GetPixel(x, y), color, color.a)); // blend
+            return tex;
+        }
     }
 }

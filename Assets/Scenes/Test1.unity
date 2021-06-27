@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.45119715, g: 0.50094205, b: 0.5737297, a: 1}
+  m_IndirectSpecularColor: {r: 0.44947845, g: 0.4995541, b: 0.5756845, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -761,13 +761,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 705507993}
-  m_LocalRotation: {x: -0.49257973, y: -0.6153144, z: 0.58634204, w: 0.18696657}
+  m_LocalRotation: {x: 0.13968922, y: -0.68524396, z: 0.35033306, w: 0.6230526}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 2
-  m_LocalEulerAnglesHint: {x: 32.505, y: 253.289, z: -258.172}
+  m_LocalEulerAnglesHint: {x: 40.859, y: 271.656, z: -341.09}
 --- !u!1 &770647656
 GameObject:
   m_ObjectHideFlags: 0
@@ -1494,10 +1494,10 @@ RectTransform:
   m_Father: {fileID: 434936945}
   m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -397.2, y: 105}
-  m_SizeDelta: {x: 205.1423, y: 191.4493}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 329, y: -221.1}
+  m_SizeDelta: {x: 316.1374, y: 295.03564}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1371825857
 MonoBehaviour:
@@ -1570,7 +1570,8 @@ MonoBehaviour:
   meanWeight: 2
   modelProtoTxt: D:\Downloads\deploy.prototxt
   caffeModel: D:\Downloads\res10_300x300_ssd_iter_140000.caffemodel
-  classifierFilename: D:\Downloads\haarcascade_frontalface_alt2.xml
+  classifierFilename: D:\work\3dfeatures\haarcascade_frontalface_default.xml
+  facemarkModel: D:\work\3dfeatures\lbfmodel.yaml
 --- !u!4 &1396186865
 Transform:
   m_ObjectHideFlags: 0

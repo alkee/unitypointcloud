@@ -267,7 +267,8 @@ public class Test1
     {
         //Dnn();
         //DetectionFromDepthMap();
-        DetectionFromMeshRendering();
+        //DetectionFromMeshRendering();
+        DetectNose();
     }
 
 
@@ -324,16 +325,19 @@ public class Test1
         line.useWorldSpace = false;
     }
 
-    private List<RectInt> DetectByCascadeClassifier(string classifierFilename, Texture2D tex)
+    private System.Drawing.Rectangle[] DetectByCascadeClassifier(string classifierFilename, Emgu.CV.Image<Emgu.CV.Structure.Bgr, byte> img)
     {
-        var mat = EmguCV.CreateCvImage(tex);
-
         var c = new Emgu.CV.CascadeClassifier(classifierFilename);
-        var rs = c.DetectMultiScale(mat);
+        var rs = c.DetectMultiScale(img);
         if (rs.Length == 0) Debug.LogWarning($"CascadeCassifier: no feature detected by {classifierFilename}");
 
-        // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
-        return rs.Select(r => new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height)).ToList();
+        return rs;
+    }
+
+    private System.Drawing.Rectangle[] DetectByCascadeClassifier(string classifierFilename, Texture2D tex)
+    {
+        var img = EmguCV.CreateCvImage(tex);
+        return DetectByCascadeClassifier(classifierFilename, img);
     }
 
     [Header("Dnn")]
@@ -482,13 +486,15 @@ public class Test1
         }
 
         obj.gameObject.SetActive(true);
-        pcr.gameObject.SetActive(false);        
+        pcr.gameObject.SetActive(false);
 
         var tex = CreateDepthMap(obj, 640, 480);
         var rects = DetectByCascadeClassifier(classifierFilename, tex);
         foreach (var r in rects)
         {
-            tex.DrawRect(r, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+            // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
+            var rct = new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height);
+            tex.DrawRect(rct, new Color(0.0f, 1.0f, 0.0f, 0.3f));
         }
         tex.Apply();
 
@@ -512,9 +518,70 @@ public class Test1
         var rects = DetectByCascadeClassifier(classifierFilename, tex);
         foreach (var r in rects)
         {
-            tex.DrawRect(r, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+            // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
+            var rct = new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height);
+            tex.DrawRect(rct, new Color(0.0f, 1.0f, 0.0f, 0.3f));
         }
         tex.Apply();
+
+        // visualize
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
+    [Header("Face landmark")]
+    public string facemarkModel; // https://raw.githubusercontent.com/kurnianggoro/GSOC2017/master/data/lbfmodel.yaml
+
+    private void DetectNose()
+    {
+        // https://docs.opencv.org/3.4.14/d2/d42/tutorial_face_landmark_detection_in_an_image.html
+        // https://docs.opencv.org/3.4.14/d7/dec/tutorial_facemark_usage.html
+        // https://github.com/emgucv/emgucv/blob/7b824371fd93f37296efa073c56d399f57d178d6/Emgu.CV.Test/AutoTestVarious.cs#L3730
+
+        if (System.IO.File.Exists(classifierFilename) == false)
+        {
+            Debug.LogWarning($"file not found : {classifierFilename}");
+            return;
+        }
+        if (System.IO.File.Exists(facemarkModel) == false)
+        {
+            Debug.LogWarning($"file not found : {facemarkModel}");
+            return;
+        }
+
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
+
+        var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
+        var img = EmguCV.CreateCvImage(tex);
+        var faceRegions = DetectByCascadeClassifier(classifierFilename, img);
+        if (faceRegions.Length == 0) { Debug.LogWarning($"face not detected"); return; }
+
+        using (var facemarkParam = new Emgu.CV.Face.FacemarkLBFParams())
+        using (var facemark = new Emgu.CV.Face.FacemarkLBF(facemarkParam))
+        using (var vr = new Emgu.CV.Util.VectorOfRect(faceRegions))
+        using (var landmarks = new Emgu.CV.Util.VectorOfVectorOfPointF())
+        {
+            Emgu.CV.Face.FaceInvoke.LoadModel(facemark, facemarkModel); // facemark.LoadModel(facemarkModel);
+            Emgu.CV.Face.FaceInvoke.Fit(facemark, img, vr, landmarks); // facemark.Fit(img, vr, landmarks);
+
+            int len = landmarks.Size;
+            Debug.Log($"{len} landmark detected");
+            for (int i = 0; i < landmarks.Size; i++)
+            {
+                using (var vpf = landmarks[i])
+                {
+                    Debug.Log($"  [{i}] has {vpf.Size} points");
+                    Emgu.CV.Face.FaceInvoke.DrawFacemarks(img, vpf, new Emgu.CV.Structure.MCvScalar(0, 255, 0));
+                    //var points = vpf.ToArray();
+                    //foreach (var p in points)
+                    //tex.DrawPoint(Mathf.RoundToInt(p.X), Mathf.RoundToInt(p.Y), new Color(0.0f, 1.0f, 0.0f, 0.3f));
+                }
+            }
+        }
+
+        tex = EmguCV.CreateTexture(img);
+        //tex.Apply();
 
         // visualize
         imageTarget.texture = tex;
