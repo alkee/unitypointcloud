@@ -260,7 +260,8 @@ public class Test1
 
     public void Test5()
     {
-        Dnn();
+        //Dnn();
+        DepthMap();
     }
 
 
@@ -389,7 +390,7 @@ public class Test1
         var net = Emgu.CV.Dnn.DnnInvoke.ReadNetFromCaffe(modelProtoTxt, caffeModel);
         var blob = Emgu.CV.Dnn.DnnInvoke.BlobFromImage(img);
         net.SetInput(blob, "data");
-        
+
         var detections = net.Forward();
 
         var confidenceThreshold = 0.5f;
@@ -399,14 +400,14 @@ public class Test1
         var step = dimSizes[3] * sizeof(float);
         var start = detections.DataPointer;
 
-        for(var i=0;i<dimSizes[2]; i++)
+        for (var i = 0; i < dimSizes[2]; i++)
         {
             var values = new float[dimSizes[3]];
             System.Runtime.InteropServices.Marshal.Copy(new IntPtr(start.ToInt64() + step * i), values, 0, dimSizes[3]);
             var confident = values[2];
             if (confident < confidenceThreshold) continue;
 
-            float xLeftBottom = values[3] * img.Rows;
+            float xLeftBottom = values[3] * img.Rows; // Emgu.CV.Test/AutoTestVarious.cs 에서는 rows-cols 이 반대인 듯.
             float yLeftBottom = values[4] * img.Cols;
             float xRightTop = values[5] * img.Rows;
             float yRightTop = values[6] * img.Cols;
@@ -437,11 +438,65 @@ public class Test1
         imageTarget.gameObject.SetActive(true);
     }
 
+    private void DepthMap()
+    {
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
 
-    //private static Vector3 Opencv2DposTo3Dpos(int x, int y, int textureWidth, int textureHeight, Camera cam)
-    //{
-    //    var px = x / (float)textureWidth;
-    //    var py = y / (float)textureHeight;
+        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
+        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
 
-    //}
+        var tex = new Texture2D(640, 480); //, TextureFormat.Alpha8, false);
+        var col = obj.GetComponent<MeshCollider>();
+        if (!col)
+        {
+            col = obj.gameObject.AddComponent<MeshCollider>();
+        }
+        col.sharedMesh = obj.DefaultMeshFilter.mesh;
+
+        var buffer = CreateYDepthBuffer(col, tex.width, tex.height, true);
+
+        for (var y = 0; y < tex.height; ++y)
+            for (var x = 0; x < tex.width; ++x)
+            {
+                var val = (float)buffer[x, y] / byte.MaxValue;
+                tex.SetPixel(x, y, new Color(val, val, val));
+            }
+
+        // visualize
+        tex.Apply();
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
+    private static byte[,] CreateYDepthBuffer(MeshCollider col, int width, int height, bool bottomToTop = false)
+    {
+        var yDir = bottomToTop ? -1 : 1;
+        var bbox = col.bounds; // same as col.sharedMesh.bounds ?
+        // length per pixel
+        var resX = bbox.size.x / (width - 1);
+        var resZ = bbox.size.z / (height - 1);
+
+        // prixel per length
+        var resY = byte.MaxValue / bbox.size.y;
+        var ret = new byte[width, height];
+
+        const int RAY_DISTANCE = 5;
+        for (var y = 0; y < height; ++y)
+            for (var x = 0; x < width; ++x)
+            {
+                var x3d = bbox.min.x + resX * x;
+                var z3d = bbox.min.z + resZ * y;
+                var origin = new Vector3(x3d, bbox.max.y + (1 * yDir)/* out of mesh */, z3d);
+                var dir = Vector3.up * (-1 * yDir);
+                if (col.Raycast(new Ray(origin, dir), out var hit, RAY_DISTANCE * 2))
+                {
+                    var val = bottomToTop
+                        ? (byte)((bbox.max.y - hit.point.y) * resY)
+                        : (byte)((hit.point.y - bbox.min.y) * resY);
+                    ret[x, y] = val;
+                }
+            }
+        return ret;
+    }
 }
