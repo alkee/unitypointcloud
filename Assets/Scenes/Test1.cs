@@ -39,6 +39,7 @@ public class Test1
 
     [Header("Pointclouds")]
     public bool drawSvdPlaneVectors;
+
     [aus.Property.ConditionalHide(nameof(drawSvdPlaneVectors))]
     public Transform lineContainer;
 
@@ -171,7 +172,7 @@ public class Test1
     }
 
     public void CalculateEffectiveEnergy()
-    {
+    { // https://www.sciencedirect.com/science/article/abs/pii/S0167865506000663?via%3Dihub
         if (pc == null)
         {
             Debug.LogWarning("NO point cloud data");
@@ -210,16 +211,17 @@ public class Test1
         ColorizeScalarField(pcr, sv);
     }
 
-
     [Header("Clustering")]
     public float meanWeight = 2.0f;
 
     private List<GameObject> clusterCenters = new List<GameObject>();
+
     private void ClearClusters()
     {
         foreach (var c in clusterCenters)
             Destroy(c);
     }
+
     public void Test4()
     {
         ClearClusters();
@@ -268,9 +270,9 @@ public class Test1
         //Dnn();
         //DetectionFromDepthMap();
         //DetectionFromMeshRendering();
+        //FaceLandmark();
         DetectNose();
     }
-
 
     private void ClearLines()
     {
@@ -342,6 +344,7 @@ public class Test1
 
     [Header("Dnn")]
     public string modelProtoTxt; // deploy.prototxt
+
     public string caffeModel; // res10_300x300_ssd_iter_140000.caffemodel
 
     private void Dnn()
@@ -363,7 +366,7 @@ public class Test1
         pcr.gameObject.SetActive(false);
 
         if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
-        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
+        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우
 
         var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
         var img = EmguCV.CreateCvImage(tex);
@@ -405,7 +408,6 @@ public class Test1
             var faceRegion = new RectInt(xMin, img.Cols - yMin - height, width, height);
 
             Debug.Log($"{values[0]} {values[1]} c:{values[2]} / {values[3]}, {values[4]}, {values[5]}, {values[6]} => {faceRegion:F4}");
-
 
             rects.Add(faceRegion);
         }
@@ -532,7 +534,7 @@ public class Test1
     [Header("Face landmark")]
     public string facemarkModel; // https://raw.githubusercontent.com/kurnianggoro/GSOC2017/master/data/lbfmodel.yaml
 
-    private void DetectNose()
+    private void FaceLandmark()
     {
         // https://docs.opencv.org/3.4.14/d2/d42/tutorial_face_landmark_detection_in_an_image.html
         // https://docs.opencv.org/3.4.14/d7/dec/tutorial_facemark_usage.html
@@ -588,5 +590,43 @@ public class Test1
         imageTarget.gameObject.SetActive(true);
     }
 
+    private void DetectNose()
+    {
+        CalculateEffectiveEnergy();
 
+        var significantRegion = obj.DefaultMeshFilter.mesh.bounds;
+        // x, z 의 일정부분 margin 영역 제거 ; CT 의 단면이 나타나는 영역에 effective energy 가 크게 잡히는 경우 제외
+        significantRegion.Expand(Vector3.Scale(significantRegion.size, new Vector3(-0.2f, 1.0f, -0.2f)));
+
+        float maxY = float.MinValue;
+        int maxYIndex = -1;
+        var cutline = Mathf.Lerp(sv.Mean, sv.Max, 0.2f);
+        for (var i = 0; i < pc.Points.Length; ++i)
+        {
+            var p = pc.Points[i];
+            if (significantRegion.Contains(p) == false) { sv.Values[i] = sv.Min; continue; } // margin 영역 point 제외
+            if (sv.Values[i] < cutline) { sv.Values[i] = sv.Min; continue; }
+
+            if (maxY < p.y) // y 값이 최대인 point 찾기
+            {
+                maxY = p.y;
+                maxYIndex = i;
+            }
+        }
+        if (maxYIndex < 0)
+        {
+            Debug.LogWarning("nose tip not found");
+            return;
+        }
+
+        // visualize
+        ColorizeScalarField(pcr, sv);
+
+        ClearClusters();
+        var noseTip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        noseTip.transform.position = pc.Points[maxYIndex];
+        noseTip.transform.localScale = Vector3.one * 0.01f;
+        clusterCenters.Add(noseTip);
+
+    }
 }
