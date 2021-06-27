@@ -1563,14 +1563,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37e4e93fc91936c47abc62f978650116, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  imageTarget: {fileID: 1371825857}
   drawSvdPlaneVectors: 0
   lineContainer: {fileID: 408103673}
   radius: 0.03
   meanWeight: 2
-  imageTarget: {fileID: 1371825857}
-  classifierFilename: D:\Downloads\haarcascade_mcs_nose.xml
   modelProtoTxt: D:\Downloads\deploy.prototxt
   caffeModel: D:\Downloads\res10_300x300_ssd_iter_140000.caffemodel
+  classifierFilename: D:\Downloads\haarcascade_frontalface_alt2.xml
 --- !u!4 &1396186865
 Transform:
   m_ObjectHideFlags: 0

@@ -15,12 +15,16 @@ public class Test1
     private PointCloud pc;
     private ScalarValues sv;
 
+    [SerializeField]
+    private UnityEngine.UI.RawImage imageTarget;
+
     private void Awake()
     {
         Debug.Assert(lineContainer);
 
         obj = FindObjectOfType<WavefrontObjMesh>(true); Debug.Assert(obj);
         pcr = FindObjectOfType<PointCloudRenderer>(true); Debug.Assert(pcr);
+        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
     }
 
     private void OpenFile()
@@ -84,6 +88,7 @@ public class Test1
     public void Test()
     {
         ClearClusters();
+        imageTarget.gameObject.SetActive(false);
         OpenFile();
         CreatePointCloud();
     }
@@ -261,7 +266,8 @@ public class Test1
     public void Test5()
     {
         //Dnn();
-        DepthMap();
+        //DetectionFromDepthMap();
+        DetectionFromMeshRendering();
     }
 
 
@@ -318,43 +324,16 @@ public class Test1
         line.useWorldSpace = false;
     }
 
-    [Header("CascadeClassifier")]
-    public UnityEngine.UI.RawImage imageTarget;
-    public string classifierFilename;
-
-    private void CascadeClassifier()
+    private List<RectInt> DetectByCascadeClassifier(string classifierFilename, Texture2D tex)
     {
-        if (System.IO.File.Exists(classifierFilename) == false)
-        {
-            Debug.LogWarning($"file not found : {classifierFilename}");
-            return;
-        }
-
-        obj.gameObject.SetActive(true);
-        pcr.gameObject.SetActive(false);
-
-        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
-        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
-
-        var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
         var mat = EmguCV.CreateCvImage(tex);
 
         var c = new Emgu.CV.CascadeClassifier(classifierFilename);
         var rs = c.DetectMultiScale(mat);
-        if (rs.Length == 0) Debug.LogWarning("no feature detected");
+        if (rs.Length == 0) Debug.LogWarning($"CascadeCassifier: no feature detected by {classifierFilename}");
 
-        foreach (var r in rs)
-        {
-            // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
-            var rect = new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height);
-            Debug.Log($"(x={r.X}, y={r.Y}, w={r.Width}, h={r.Height} ==> to {rect}");
-            tex.DrawRect(rect, new Color(0.0f, 1.0f, 0.0f, 0.3f));
-        }
-        tex.Apply();
-
-        // visualize
-        imageTarget.texture = tex;
-        imageTarget.gameObject.SetActive(true);
+        // texture 는 bottom-left 가 (0,0) mat 은 top-left 가 (0,0)
+        return rs.Select(r => new RectInt(r.Left, tex.height - r.Top - r.Height, r.Width, r.Height)).ToList();
     }
 
     [Header("Dnn")]
@@ -438,15 +417,9 @@ public class Test1
         imageTarget.gameObject.SetActive(true);
     }
 
-    private void DepthMap()
+    private Texture2D CreateDepthMap(WavefrontObjMesh source, int width, int height, bool bottomToTop = false)
     {
-        obj.gameObject.SetActive(true);
-        pcr.gameObject.SetActive(false);
-
-        if (!imageTarget) imageTarget = FindObjectOfType<UnityEngine.UI.RawImage>(true);
-        imageTarget.gameObject.SetActive(false); // 다시 실행되는 경우 
-
-        var tex = new Texture2D(640, 480); //, TextureFormat.Alpha8, false);
+        var tex = new Texture2D(width, height); //, TextureFormat.Alpha8, false);
         var col = obj.GetComponent<MeshCollider>();
         if (!col)
         {
@@ -454,7 +427,7 @@ public class Test1
         }
         col.sharedMesh = obj.DefaultMeshFilter.mesh;
 
-        var buffer = CreateYDepthBuffer(col, tex.width, tex.height, true);
+        var buffer = CreateYDepthBuffer(col, tex.width, tex.height, bottomToTop);
 
         for (var y = 0; y < tex.height; ++y)
             for (var x = 0; x < tex.width; ++x)
@@ -463,10 +436,7 @@ public class Test1
                 tex.SetPixel(x, y, new Color(val, val, val));
             }
 
-        // visualize
-        tex.Apply();
-        imageTarget.texture = tex;
-        imageTarget.gameObject.SetActive(true);
+        return tex;
     }
 
     private static byte[,] CreateYDepthBuffer(MeshCollider col, int width, int height, bool bottomToTop = false)
@@ -499,4 +469,57 @@ public class Test1
             }
         return ret;
     }
+
+    [Header("Casade Classifier")]
+    public string classifierFilename;
+
+    private void DetectionFromDepthMap()
+    {
+        if (System.IO.File.Exists(classifierFilename) == false)
+        {
+            Debug.LogWarning($"file not found : {classifierFilename}");
+            return;
+        }
+
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);        
+
+        var tex = CreateDepthMap(obj, 640, 480);
+        var rects = DetectByCascadeClassifier(classifierFilename, tex);
+        foreach (var r in rects)
+        {
+            tex.DrawRect(r, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+        }
+        tex.Apply();
+
+        // visualize
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
+    private void DetectionFromMeshRendering()
+    {
+        if (System.IO.File.Exists(classifierFilename) == false)
+        {
+            Debug.LogWarning($"file not found : {classifierFilename}");
+            return;
+        }
+
+        obj.gameObject.SetActive(true);
+        pcr.gameObject.SetActive(false);
+
+        var tex = Camera.main.Render(640, 480, RenderTextureFormat.ARGB32);
+        var rects = DetectByCascadeClassifier(classifierFilename, tex);
+        foreach (var r in rects)
+        {
+            tex.DrawRect(r, new Color(0.0f, 1.0f, 0.0f, 0.3f));
+        }
+        tex.Apply();
+
+        // visualize
+        imageTarget.texture = tex;
+        imageTarget.gameObject.SetActive(true);
+    }
+
+
 }
