@@ -39,6 +39,7 @@ public class Test1
 
     [Header("Pointclouds")]
     public bool drawSvdPlaneVectors;
+    public bool drawEffectiveColor = false;
 
     [aus.Property.ConditionalHide(nameof(drawSvdPlaneVectors))]
     public Transform lineContainer;
@@ -97,7 +98,7 @@ public class Test1
     [Header("Geometric features")]
     public float radius = 0.03f;
 
-    public void Test2()
+    public void Roughness()
     {
         if (pc == null)
         {
@@ -134,7 +135,7 @@ public class Test1
         ColorizeScalarField(pcr, sv);
     }
 
-    public void Test3()
+    public void NormalChangeRate()
     {
         if (pc == null)
         {
@@ -590,30 +591,46 @@ public class Test1
         imageTarget.gameObject.SetActive(true);
     }
 
+    [Header("Nose detection")]
+    public Vector3 faceDirection = Vector3.up;
+    [Tooltip("boundingbox 대각선 거리 기준 중심축에서의 휴효거리")]
+    [Range(0.01f, 0.5f)]
+    public float maximumDistanceRate = 0.15f;
+    [Tooltip("평균~최고 사이의 지점")]
+    [Range(0.0f, 1.0f)]
+    public float thresholdRate = 0.2f;
+
     private void DetectNose()
     {
-        CalculateEffectiveEnergy();
+        //CalculateEffectiveEnergy();
+        NormalChangeRate();
 
-        var significantRegion = obj.DefaultMeshFilter.mesh.bounds;
-        // x, z 의 일정부분 margin 영역 제거 ; CT 의 단면이 나타나는 영역에 effective energy 가 크게 잡히는 경우 제외
-        significantRegion.Expand(Vector3.Scale(significantRegion.size, new Vector3(-0.2f, 1.0f, -0.2f)));
+        var bounds = obj.DefaultMeshFilter.mesh.bounds;
+        faceDirection.Normalize();
+        var centerRay = new Ray(bounds.center, faceDirection);
+        var centerPlane = new Plane(faceDirection, bounds.center);
 
-        float maxY = float.MinValue;
-        int maxYIndex = -1;
-        var cutline = Mathf.Lerp(sv.Mean, sv.Max, 0.2f);
+        // CT 의 단면이 나타나는 영역에 effective energy 가 크게 잡히는 경우가 있어 중심에서 먼 점을 제외하기 위함
+        var maximumDistance = Vector3.Distance(bounds.min, bounds.max) * maximumDistanceRate;
+        var threshold = Mathf.Lerp(sv.Mean, sv.Max, thresholdRate);
+
+        float max = float.MinValue;
+        int maxIndex = -1;
         for (var i = 0; i < pc.Points.Length; ++i)
         {
+            if (sv.Values[i] < threshold) { if (drawEffectiveColor) sv.Values[i] = sv.Min; continue; }
             var p = pc.Points[i];
-            if (significantRegion.Contains(p) == false) { sv.Values[i] = sv.Min; continue; } // margin 영역 point 제외
-            if (sv.Values[i] < cutline) { sv.Values[i] = sv.Min; continue; }
+            var distanceFromCenterRay = Vector3.Cross(centerRay.direction, p - centerRay.origin).magnitude; // https://answers.unity.com/questions/568773
+            if (distanceFromCenterRay > maximumDistance) { if (drawEffectiveColor) sv.Values[i] = float.NaN; continue; } // margin 영역 point 제외
 
-            if (maxY < p.y) // y 값이 최대인 point 찾기
+            var distance = centerPlane.GetDistanceToPoint(p);
+            if (max < distance) // center 에서 거리(signed)가 최대인 point 찾기
             {
-                maxY = p.y;
-                maxYIndex = i;
+                max = distance;
+                maxIndex = i;
             }
         }
-        if (maxYIndex < 0)
+        if (maxIndex < 0)
         {
             Debug.LogWarning("nose tip not found");
             return;
@@ -624,7 +641,7 @@ public class Test1
 
         ClearClusters();
         var noseTip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        noseTip.transform.position = pc.Points[maxYIndex];
+        noseTip.transform.position = pc.Points[maxIndex];
         noseTip.transform.localScale = Vector3.one * 0.01f;
         clusterCenters.Add(noseTip);
 
